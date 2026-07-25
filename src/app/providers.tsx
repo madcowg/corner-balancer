@@ -13,6 +13,7 @@ import { validateMeasurementInput } from "../domain/validation/measurement";
 import { LocalAppRepository } from "../data/local/localAppRepository";
 import type { PersistedAppState } from "../data/repositories/types";
 import { createDefaultPersistedState } from "../data/migrations/appState";
+import { remapGuestDataToUser } from "../data/firebase/cloudState";
 import { createGuestOwnerId, createNewSession } from "../features/session/defaults";
 import { isFirebaseConfigured } from "../firebase/app";
 import { CornerBalanceAppContext } from "./context";
@@ -116,6 +117,7 @@ export function AppProviders({ children }: PropsWithChildren) {
     saveStatus: "idle"
   });
   const loadedRef = useRef(false);
+  const autosaveRunIdRef = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -220,6 +222,7 @@ export function AppProviders({ children }: PropsWithChildren) {
       return;
     }
 
+    const autosaveRunId = ++autosaveRunIdRef.current;
     const timeoutId = window.setTimeout(() => {
       setState((current) => ({
         ...current,
@@ -230,15 +233,51 @@ export function AppProviders({ children }: PropsWithChildren) {
       void repository
         .save(state.data)
         .then(() => {
+          if (autosaveRunIdRef.current !== autosaveRunId) {
+            return;
+          }
+
+          const savedAt = createTimestamp();
           startTransition(() => {
             setState((current) => ({
               ...current,
               saveStatus: "saved",
-              lastSavedAt: createTimestamp()
+              lastSavedAt: savedAt,
+              error: undefined
             }));
           });
+
+          if (state.data.auth.mode !== "signed_in" || !state.data.auth.uid) {
+            return;
+          }
+
+          void loadFirestoreRepositoryModule()
+            .then(({ FirestoreAppRepository }) => {
+              const cloudRepository = new FirestoreAppRepository(state.data.auth.uid!);
+              return cloudRepository.save(state.data);
+            })
+            .catch((error: unknown) => {
+              if (autosaveRunIdRef.current !== autosaveRunId) {
+                return;
+              }
+
+              startTransition(() => {
+                setState((current) => ({
+                  ...current,
+                  saveStatus: "sync_pending",
+                  error:
+                    error instanceof Error
+                      ? error.message
+                      : "Saved locally, but Firestore sync needs attention."
+                }));
+              });
+            });
         })
         .catch((error: unknown) => {
+          if (autosaveRunIdRef.current !== autosaveRunId) {
+            return;
+          }
+
           startTransition(() => {
             setState((current) => ({
               ...current,
@@ -561,25 +600,12 @@ export function AppProviders({ children }: PropsWithChildren) {
         const guestOwnerId = createGuestOwnerId();
         const { FirestoreAppRepository } = await loadFirestoreRepositoryModule();
         const cloudRepository = new FirestoreAppRepository(userId);
-        const remappedState: PersistedAppState = {
-          ...state.data,
-          auth: {
-            ...state.data.auth,
-            mode: "signed_in",
-            uid: userId,
-            pendingGuestSync: false
-          },
-          vehicles: state.data.vehicles.map((vehicle) =>
-            vehicle.ownerId === guestOwnerId
-              ? { ...vehicle, ownerId: userId, updatedAt: createTimestamp() }
-              : vehicle
-          ),
-          sessions: state.data.sessions.map((session) =>
-            session.ownerId === guestOwnerId
-              ? { ...session, ownerId: userId, updatedAt: createTimestamp() }
-              : session
-          )
-        };
+        const remappedState: PersistedAppState = remapGuestDataToUser(
+          state.data,
+          guestOwnerId,
+          userId,
+          createTimestamp()
+        );
         const cloudState = await cloudRepository.load();
         const mergedState: PersistedAppState = {
           ...remappedState,

@@ -23,17 +23,32 @@ function OfflineStatus() {
 }
 
 function SaveStateIndicator() {
-  const { saveStatus, lastSavedAt } = useCornerBalanceApp();
-
-  return (
-    <div className="rounded-full border border-border bg-surface px-3 py-1 text-small font-medium text-muted">
-      {saveStatus === "saving"
-        ? "Saving local draft"
-        : saveStatus === "saved"
-          ? `Saved ${lastSavedAt ? new Date(lastSavedAt).toLocaleTimeString() : "recently"}`
+  const { saveStatus, lastSavedAt, error } = useCornerBalanceApp();
+  const statusText =
+    saveStatus === "saving"
+      ? "Saving local draft"
+      : saveStatus === "saved"
+        ? `Saved ${lastSavedAt ? new Date(lastSavedAt).toLocaleTimeString() : "recently"}`
+        : saveStatus === "sync_pending"
+          ? "Saved locally, cloud sync needs attention"
           : saveStatus === "error"
             ? "Local save needs attention"
-            : "Autosave ready"}
+            : "Autosave ready";
+  const statusTone =
+    saveStatus === "sync_pending"
+      ? "border-warning/20 bg-warning/10 text-warning"
+      : saveStatus === "error"
+        ? "border-danger/20 bg-danger/10 text-danger"
+        : "border-border bg-surface text-muted";
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      title={error}
+      className={`rounded-full border px-3 py-1 text-small font-medium ${statusTone}`}
+    >
+      {statusText}
     </div>
   );
 }

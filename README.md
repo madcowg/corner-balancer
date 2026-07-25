@@ -6,6 +6,7 @@ CornerBalance is a mobile-first React and TypeScript PWA for guided vehicle corn
 
 - The full guided workflow is implemented from garage through report preview and JSON/CSV/PDF export.
 - Development assets are generated from `public/data/assets-manifest.csv` as exact-filename placeholders.
+- Signed-in users autosave locally first and then sync owned vehicles and sessions to Firestore in the background.
 - `npm run build` succeeds for development handoff with draft placeholders.
 - `npm run build:release` is expected to fail until draft assets are replaced with approved Figma exports and marked `approved` in the manifest.
 

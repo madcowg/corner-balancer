@@ -17,7 +17,7 @@ import type {
 import type { MeasurementInput, MeasurementValidationResult } from "../domain/validation/measurement";
 import type { PersistedAppState } from "../data/repositories/types";
 
-export type SaveStatus = "idle" | "saving" | "saved" | "error";
+export type SaveStatus = "idle" | "saving" | "saved" | "sync_pending" | "error";
 
 export interface VehicleDraftInput {
   nickname: string;
