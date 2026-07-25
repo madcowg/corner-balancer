@@ -95,6 +95,45 @@ export function createNewSession(vehicle: Vehicle): Session {
   };
 }
 
+export function createSessionFromTemplate(sourceSession: Session, vehicle: Vehicle): Session {
+  const timestamp = nowIso();
+
+  return {
+    id: crypto.randomUUID(),
+    vehicleId: vehicle.id,
+    ownerId: vehicle.ownerId || GUEST_OWNER_ID,
+    status: "draft",
+    currentStep: "setup",
+    targetCrossPct: sourceSession.setupSnapshot.targetCrossPct,
+    crossTolerancePct: sourceSession.setupSnapshot.crossTolerancePct,
+    sideHeightToleranceMm: sourceSession.setupSnapshot.sideHeightToleranceMm,
+    totalDriftWarningPct: sourceSession.totalDriftWarningPct,
+    setupSnapshot: {
+      ...sourceSession.setupSnapshot,
+      ...(sourceSession.setupSnapshot.targetRideHeightsMm
+        ? {
+            targetRideHeightsMm: {
+              ...sourceSession.setupSnapshot.targetRideHeightsMm
+            }
+          }
+        : {}),
+      ...(sourceSession.setupSnapshot.tirePressuresPsi
+        ? {
+            tirePressuresPsi: {
+              ...sourceSession.setupSnapshot.tirePressuresPsi
+            }
+          }
+        : {})
+    },
+    safetyChecklist: createWorkspaceChecklist(),
+    measurements: [],
+    adjustments: [],
+    finalChecklist: createFinalChecklist(),
+    createdAt: timestamp,
+    updatedAt: timestamp
+  };
+}
+
 export function nextStepLabel(step: SessionFlowStep) {
   return step;
 }

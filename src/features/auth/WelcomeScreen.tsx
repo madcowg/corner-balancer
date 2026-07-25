@@ -8,12 +8,17 @@ import { SurfaceCard } from "../../components/ui/SurfaceCard";
 import { StatusBadge } from "../../components/ui/StatusBadge";
 import { useCornerBalanceApp } from "../../app/context";
 import { buildSessionStepPath } from "../../components/ui/buildSessionStepPath";
+import { getLatestNonArchivedSession, getSessionLaunchStep } from "../../domain/workflow/sessionHistory";
 
 export function WelcomeScreen() {
   const navigate = useNavigate();
   const app = useCornerBalanceApp();
   const [email, setEmail] = useState("");
-  const lastSession = app.lastSessionId ? app.getSession(app.lastSessionId) : undefined;
+  const preferredLastSession = app.lastSessionId ? app.getSession(app.lastSessionId) : undefined;
+  const lastSession =
+    preferredLastSession?.status !== "archived"
+      ? preferredLastSession
+      : getLatestNonArchivedSession(app.sessions);
 
   if (!app.ready) {
     return (
@@ -98,9 +103,13 @@ export function WelcomeScreen() {
             </p>
             <div className="mt-4 flex flex-wrap gap-3">
               <Button
-                onClick={() => navigate(buildSessionStepPath(lastSession.id, lastSession.currentStep))}
+                onClick={() =>
+                  navigate(buildSessionStepPath(lastSession.id, getSessionLaunchStep(lastSession)))
+                }
               >
-                Resume session
+                {lastSession.status === "complete" || lastSession.status === "alignment_pending"
+                  ? "Open latest report"
+                  : "Resume session"}
               </Button>
               <Button variant="secondary" onClick={() => navigate("/compare")}>
                 Compare sessions

@@ -184,6 +184,7 @@ export interface Session {
   vehicleId: string;
   ownerId: string;
   status: SessionStatus;
+  archivedFromStatus?: Exclude<SessionStatus, "archived">;
   currentStep: SessionFlowStep;
   targetCrossPct: number;
   crossTolerancePct: number;
@@ -304,6 +305,7 @@ export const sessionSchema = z.object({
   vehicleId: z.string().min(1),
   ownerId: z.string().min(1),
   status: z.enum(sessionStatuses),
+  archivedFromStatus: z.enum(["draft", "active", "complete", "alignment_pending"]).optional(),
   currentStep: z.enum(sessionFlowSteps),
   targetCrossPct: z.number(),
   crossTolerancePct: z.number().nonnegative(),

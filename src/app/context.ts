@@ -57,6 +57,9 @@ export interface AppContextValue {
   createVehicle(input: VehicleDraftInput): Vehicle;
   updateVehicle(vehicleId: string, updates: Partial<VehicleDraftInput>): void;
   createSession(vehicleId: string): Session | undefined;
+  createSessionFromTemplate(sessionId: string): Session | undefined;
+  archiveSession(sessionId: string): void;
+  restoreSession(sessionId: string): void;
   updateSessionSetup(sessionId: string, updates: Partial<SetupSnapshot>): void;
   setSessionStep(sessionId: string, step: SessionFlowStep): void;
   updateChecklistItem(

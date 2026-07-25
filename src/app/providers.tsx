@@ -9,12 +9,17 @@ import {
 
 import type { Adjustment, Measurement, SetupSnapshot, Vehicle } from "../domain/types";
 import { getNextSessionFlowStep } from "../domain/workflow/sessionFlow";
+import { getLatestNonArchivedSession, getRestoredSessionStatus } from "../domain/workflow/sessionHistory";
 import { validateMeasurementInput } from "../domain/validation/measurement";
 import { LocalAppRepository } from "../data/local/localAppRepository";
 import type { PersistedAppState } from "../data/repositories/types";
 import { createDefaultPersistedState } from "../data/migrations/appState";
 import { remapGuestDataToUser } from "../data/firebase/cloudState";
-import { createGuestOwnerId, createNewSession } from "../features/session/defaults";
+import {
+  createGuestOwnerId,
+  createNewSession,
+  createSessionFromTemplate as createTemplatedSession
+} from "../features/session/defaults";
 import { isFirebaseConfigured } from "../firebase/app";
 import { CornerBalanceAppContext } from "./context";
 import {
@@ -42,6 +47,10 @@ function mergeById<T extends { id: string }>(localItems: T[], remoteItems: T[]) 
   remoteItems.forEach((item) => merged.set(item.id, item));
   localItems.forEach((item) => merged.set(item.id, item));
   return [...merged.values()];
+}
+
+function getLatestLiveSessionId(sessions: PersistedAppState["sessions"]) {
+  return getLatestNonArchivedSession(sessions)?.id;
 }
 
 async function loadFirebaseAuthModule() {
@@ -321,7 +330,7 @@ export function AppProviders({ children }: PropsWithChildren) {
       setLastSessionId(sessionId) {
         updateData((current) => ({
           ...current,
-          ...(sessionId ? { lastSessionId: sessionId } : {})
+          lastSessionId: sessionId
         }));
       },
       createVehicle(input) {
@@ -379,6 +388,70 @@ export function AppProviders({ children }: PropsWithChildren) {
         }));
 
         return session;
+      },
+      createSessionFromTemplate(sessionId) {
+        const sourceSession = state.data.sessions.find((entry) => entry.id === sessionId);
+        if (!sourceSession) {
+          return undefined;
+        }
+
+        const vehicle = state.data.vehicles.find((entry) => entry.id === sourceSession.vehicleId);
+        if (!vehicle) {
+          return undefined;
+        }
+
+        const session = createTemplatedSession(sourceSession, vehicle);
+        updateData((current) => ({
+          ...current,
+          sessions: [...current.sessions, session],
+          lastSessionId: session.id
+        }));
+
+        return session;
+      },
+      archiveSession(sessionId) {
+        updateData((current) => {
+          const updatedSessions = current.sessions.map((session) =>
+            session.id === sessionId && session.status !== "archived"
+              ? {
+                  ...session,
+                  archivedFromStatus: session.status,
+                  status: "archived" as const,
+                  updatedAt: createTimestamp()
+                }
+              : session
+          );
+
+          const nextLastSessionId =
+            current.lastSessionId === sessionId
+              ? getLatestLiveSessionId(updatedSessions)
+              : current.lastSessionId;
+
+          return {
+            ...current,
+            sessions: updatedSessions,
+            lastSessionId: nextLastSessionId
+          };
+        });
+      },
+      restoreSession(sessionId) {
+        updateData((current) => ({
+          ...current,
+          lastSessionId: sessionId,
+          sessions: current.sessions.map((session) =>
+            session.id === sessionId && session.status === "archived"
+              ? (() => {
+                  const { archivedFromStatus: _archivedFromStatus, ...restoredSession } = session;
+
+                  return {
+                    ...restoredSession,
+                    status: getRestoredSessionStatus(session),
+                    updatedAt: createTimestamp()
+                  };
+                })()
+              : session
+          )
+        }));
       },
       updateSessionSetup(sessionId, updates) {
         const sanitizedUpdates = compactSetupUpdates(updates);
