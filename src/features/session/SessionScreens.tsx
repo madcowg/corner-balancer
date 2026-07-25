@@ -16,6 +16,7 @@ import { CriticalWarning } from "../../components/warnings/CriticalWarning";
 import { ChecklistGroup } from "../../components/warnings/ChecklistGroup";
 import { checklistIsResolved } from "../../components/warnings/checklistIsResolved";
 import { getCrossWeightGuidance } from "../../domain/guidance/crossWeightGuidance";
+import { buildSessionSummary } from "../../domain/reporting/sessionSummary";
 import {
   buildSessionCsv,
   buildSessionJson,
@@ -882,8 +883,7 @@ export function ReportScreen() {
     return <SessionNotFound />;
   }
 
-  const baseline = session.measurements[0];
-  const finalMeasurement = session.measurements.at(-1);
+  const summary = buildSessionSummary(session);
 
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
@@ -894,13 +894,79 @@ export function ReportScreen() {
             <StatusBadge tone={session.status === "complete" ? "success" : "warning"}>
               {session.status}
             </StatusBadge>
+            <StatusBadge tone={summary.withinCrossTolerance ? "success" : "warning"}>
+              {summary.withinCrossTolerance ? "Cross within tolerance" : "Cross still outside tolerance"}
+            </StatusBadge>
           </div>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <MetricCard label="Baseline cross %" value={formatMetric(baseline?.calculations.selectedCrossPct)} />
-            <MetricCard label="Final cross %" value={formatMetric(finalMeasurement?.calculations.selectedCrossPct)} />
-            <MetricCard label="Adjustments" value={String(session.adjustments.length)} />
-            <MetricCard label="Iterations" value={String(session.measurements.length)} />
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <MetricCard label="Baseline cross %" value={formatMetric(summary.baselineCrossPct)} />
+            <MetricCard label="Final cross %" value={formatMetric(summary.finalCrossPct)} />
+            <MetricCard
+              label="Cross change %"
+              value={summary.crossChangePct == null ? "--" : `${summary.crossChangePct > 0 ? "+" : ""}${summary.crossChangePct.toFixed(2)}`}
+            />
+            <MetricCard label="Target error %" value={formatMetric(summary.finalCrossErrorPct)} />
+            <MetricCard label="Adjustments" value={String(summary.adjustmentCount)} />
+            <MetricCard label="Iterations" value={String(summary.measurementCount)} />
+            <MetricCard
+              label="Total weight change kg"
+              value={summary.totalChangeKg == null ? "--" : `${summary.totalChangeKg > 0 ? "+" : ""}${summary.totalChangeKg.toFixed(2)}`}
+            />
+            <MetricCard
+              label="Rake change mm"
+              value={summary.rakeChangeMm == null ? "--" : `${summary.rakeChangeMm > 0 ? "+" : ""}${summary.rakeChangeMm.toFixed(2)}`}
+            />
+            <MetricCard
+              label="Warnings logged"
+              value={String(summary.warningCount)}
+              helper={summary.latestWarnings[0] ?? "No latest warnings"}
+            />
           </div>
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <div className="rounded-2xl border border-border bg-canvas p-3">
+              <p className="text-caption uppercase tracking-[0.14em] text-muted">Setup snapshot</p>
+              <div className="mt-3 space-y-2 text-small text-ink">
+                <p>Event type: {session.setupSnapshot.eventType}</p>
+                <p>Fuel: {session.setupSnapshot.fuelDescription}</p>
+                <p>Ballast: {session.setupSnapshot.ballastDescription ?? "Not specified"}</p>
+                <p>Sway bar: {session.setupSnapshot.swayBarState}</p>
+                <p>
+                  Target cross: {session.targetCrossPct.toFixed(2)}% ± {session.crossTolerancePct.toFixed(2)}%
+                </p>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-border bg-canvas p-3">
+              <p className="text-caption uppercase tracking-[0.14em] text-muted">Checklist outcome</p>
+              <div className="mt-3 space-y-2 text-small text-ink">
+                <p>
+                  Safety unresolved: {summary.safetyChecklist.unresolved}
+                  {" • "}Overrides: {summary.safetyChecklist.overridden}
+                </p>
+                <p>
+                  Final unresolved: {summary.finalChecklist.unresolved}
+                  {" • "}Overrides: {summary.finalChecklist.overridden}
+                </p>
+                <p>
+                  Critical open items: {summary.safetyChecklist.criticalOpen + summary.finalChecklist.criticalOpen}
+                </p>
+                <p>
+                  Blocked open items: {summary.safetyChecklist.blockedOpen + summary.finalChecklist.blockedOpen}
+                </p>
+              </div>
+            </div>
+          </div>
+          {summary.latestWarnings.length > 0 ? (
+            <div className="mt-4 rounded-2xl border border-warning/20 bg-warning/10 p-3">
+              <p className="text-caption font-semibold uppercase tracking-[0.14em] text-warning">
+                Latest warnings
+              </p>
+              <ul className="mt-2 space-y-2 text-small text-warning">
+                {summary.latestWarnings.map((warning) => (
+                  <li key={warning}>{warning}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           <div className="mt-4 rounded-2xl border border-border bg-canvas p-3 text-small text-muted">
             Exports use the live session payload and do not depend on network access once the data and assets are cached.
           </div>

@@ -38,7 +38,16 @@ const session: Session = {
     fuelDescription: "Half tank",
     swayBarState: "neutralized"
   },
-  safetyChecklist: [],
+  safetyChecklist: [
+    {
+      id: "safe-1",
+      label: "Pads clear",
+      severity: "critical",
+      checked: false,
+      overrideReason: "Known ramp setup for this garage.",
+      updatedAt: "2026-07-25T12:20:00.000Z"
+    }
+  ],
   measurements: [
     {
       id: "m-1",
@@ -76,7 +85,15 @@ const session: Session = {
       createdAt: "2026-07-25T12:40:00.000Z"
     }
   ],
-  finalChecklist: [],
+  finalChecklist: [
+    {
+      id: "final-1",
+      label: "Torque wheels",
+      severity: "critical",
+      checked: true,
+      updatedAt: "2026-07-25T13:00:00.000Z"
+    }
+  ],
   createdAt: "2026-07-25T12:00:00.000Z",
   updatedAt: "2026-07-25T13:00:00.000Z",
   completedAt: "2026-07-25T13:05:00.000Z"
@@ -88,11 +105,15 @@ describe("report exporters", () => {
 
     expect(output).toMatch(/Spec Miata/);
     expect(output).toMatch(/sess-1/);
+    expect(output).toMatch(/"summary"/);
   });
 
-  it("serializes CSV rows for measurements and adjustments", () => {
+  it("serializes CSV rows for setup, measurements, checklist items, and adjustments", () => {
     const output = buildSessionCsv(vehicle, session);
 
+    expect(output).toMatch(/"setup"/);
+    expect(output).toMatch(/"summary"/);
+    expect(output).toMatch(/"checklist"/);
     expect(output).toMatch(/"measurement"/);
     expect(output).toMatch(/"adjustment"/);
     expect(output).toMatch(/"selected_cross_pct"/);
