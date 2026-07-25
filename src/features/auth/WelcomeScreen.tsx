@@ -6,8 +6,8 @@ import { CornerDiagram } from "../../components/illustrations/CornerDiagram";
 import { Button } from "../../components/ui/Button";
 import { SurfaceCard } from "../../components/ui/SurfaceCard";
 import { StatusBadge } from "../../components/ui/StatusBadge";
-import { useCornerBalanceApp } from "../../app/providers";
-import { buildSessionStepPath } from "../../components/ui/StepProgress";
+import { useCornerBalanceApp } from "../../app/context";
+import { buildSessionStepPath } from "../../components/ui/buildSessionStepPath";
 
 export function WelcomeScreen() {
   const navigate = useNavigate();

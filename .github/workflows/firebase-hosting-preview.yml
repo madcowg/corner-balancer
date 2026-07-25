@@ -1,0 +1,45 @@
+name: Deploy Firebase Preview
+
+on:
+  workflow_dispatch:
+    inputs:
+      channel_id:
+        description: Preview channel ID
+        required: true
+        default: corner-balance-preview
+      expires:
+        description: Preview channel expiry
+        required: true
+        default: 7d
+
+jobs:
+  deploy_preview:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    concurrency:
+      group: firebase-preview-${{ inputs.channel_id }}
+      cancel-in-progress: false
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build release bundle
+        run: npm run build:release
+
+      - name: Deploy preview channel
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_CORNER_BALANCER }}
+          projectId: ${{ vars.FIREBASE_PROJECT_ID }}
+          channelId: ${{ inputs.channel_id }}
+          expires: ${{ inputs.expires }}

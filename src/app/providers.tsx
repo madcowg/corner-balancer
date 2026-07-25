@@ -1,37 +1,26 @@
 import type { PropsWithChildren } from "react";
 import {
-  createContext,
   startTransition,
-  useContext,
   useEffect,
   useMemo,
   useRef,
   useState
 } from "react";
 
-import type {
-  Adjustment,
-  AdjustmentAmountUnit,
-  AdjustmentDirection,
-  AdjustmentType,
-  ChecklistRecord,
-  CoiloverType,
-  Corner,
-  Measurement,
-  Session,
-  SessionFlowStep,
-  SetupSnapshot,
-  Vehicle,
-  VehicleUse
-} from "../domain/types";
+import type { Adjustment, Measurement, SetupSnapshot, Vehicle } from "../domain/types";
 import { getNextSessionFlowStep } from "../domain/workflow/sessionFlow";
-import { validateMeasurementInput, type MeasurementInput } from "../domain/validation/measurement";
+import { validateMeasurementInput } from "../domain/validation/measurement";
 import { LocalAppRepository } from "../data/local/localAppRepository";
 import type { PersistedAppState } from "../data/repositories/types";
 import { createDefaultPersistedState } from "../data/migrations/appState";
 import { createGuestOwnerId, createNewSession } from "../features/session/defaults";
-
-type SaveStatus = "idle" | "saving" | "saved" | "error";
+import { isFirebaseConfigured } from "../firebase/app";
+import { CornerBalanceAppContext } from "./context";
+import {
+  type AppContextValue,
+  type SaveStatus,
+  type VehicleDraftInput
+} from "./context";
 
 interface AppRuntimeState {
   ready: boolean;
@@ -40,72 +29,8 @@ interface AppRuntimeState {
   lastSavedAt?: string | undefined;
   error?: string | undefined;
 }
-
-interface VehicleDraftInput {
-  nickname: string;
-  year?: number;
-  make?: string;
-  model?: string;
-  trim?: string;
-  primaryUse: VehicleUse;
-  coiloverType: CoiloverType;
-  preferredWeightUnit: Vehicle["preferredWeightUnit"];
-  preferredHeightUnit: Vehicle["preferredHeightUnit"];
-  notes?: string;
-}
-
-interface AdjustmentDraftInput {
-  corner: Corner;
-  adjusterType: AdjustmentType;
-  direction: AdjustmentDirection;
-  amount: number;
-  amountUnit: AdjustmentAmountUnit;
-  reason: string;
-}
-
-interface AppContextValue {
-  ready: boolean;
-  firebaseConfigured: boolean;
-  auth: PersistedAppState["auth"];
-  vehicles: Vehicle[];
-  sessions: Session[];
-  lastSessionId?: string | undefined;
-  saveStatus: SaveStatus;
-  lastSavedAt?: string | undefined;
-  error?: string | undefined;
-  getVehicle(vehicleId: string): Vehicle | undefined;
-  getSession(sessionId: string): Session | undefined;
-  setLastSessionId(sessionId?: string): void;
-  createVehicle(input: VehicleDraftInput): Vehicle;
-  updateVehicle(vehicleId: string, updates: Partial<VehicleDraftInput>): void;
-  createSession(vehicleId: string): Session | undefined;
-  updateSessionSetup(sessionId: string, updates: Partial<SetupSnapshot>): void;
-  setSessionStep(sessionId: string, step: SessionFlowStep): void;
-  updateChecklistItem(
-    sessionId: string,
-    listName: "safetyChecklist" | "finalChecklist",
-    itemId: string,
-    updates: Partial<ChecklistRecord>
-  ): void;
-  recordMeasurement(sessionId: string, input: MeasurementInput): ReturnType<typeof validateMeasurementInput>;
-  logAdjustment(sessionId: string, input: AdjustmentDraftInput): Adjustment | undefined;
-  completeSession(sessionId: string, alignmentPending: boolean): void;
-  requestEmailLink(email: string): Promise<boolean>;
-  signInWithGoogle(): Promise<boolean>;
-  signInAnonymously(): Promise<boolean>;
-  signOut(): Promise<void>;
-  syncGuestDataToCloud(): Promise<boolean>;
-  clearLocalData(): Promise<void>;
-}
-
-const CornerBalanceAppContext = createContext<AppContextValue | undefined>(undefined);
 const repository = new LocalAppRepository();
-const firebaseConfigured = Boolean(
-  import.meta.env.VITE_FIREBASE_API_KEY &&
-    import.meta.env.VITE_FIREBASE_AUTH_DOMAIN &&
-    import.meta.env.VITE_FIREBASE_PROJECT_ID &&
-    import.meta.env.VITE_FIREBASE_APP_ID
-);
+const firebaseConfigured = isFirebaseConfigured();
 
 function createTimestamp() {
   return new Date().toISOString();
@@ -684,14 +609,4 @@ export function AppProviders({ children }: PropsWithChildren) {
       {children}
     </CornerBalanceAppContext.Provider>
   );
-}
-
-export function useCornerBalanceApp() {
-  const context = useContext(CornerBalanceAppContext);
-
-  if (!context) {
-    throw new Error("useCornerBalanceApp must be used inside AppProviders.");
-  }
-
-  return context;
 }

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { supportingAssets, trainingAssets } from "../../assets/registry";
-import { useCornerBalanceApp } from "../../app/providers";
+import { useCornerBalanceApp } from "../../app/context";
 import { CornerDiagram } from "../../components/illustrations/CornerDiagram";
 import { SafetyComparison } from "../../components/illustrations/SafetyComparison";
 import { StepIllustration } from "../../components/illustrations/StepIllustration";
@@ -11,9 +11,10 @@ import { Button } from "../../components/ui/Button";
 import { MetricCard } from "../../components/ui/MetricCard";
 import { SurfaceCard } from "../../components/ui/SurfaceCard";
 import { StatusBadge } from "../../components/ui/StatusBadge";
-import { buildSessionStepPath } from "../../components/ui/StepProgress";
+import { buildSessionStepPath } from "../../components/ui/buildSessionStepPath";
 import { CriticalWarning } from "../../components/warnings/CriticalWarning";
-import { ChecklistGroup, checklistIsResolved } from "../../components/warnings/ChecklistGroup";
+import { ChecklistGroup } from "../../components/warnings/ChecklistGroup";
+import { checklistIsResolved } from "../../components/warnings/checklistIsResolved";
 import { getCrossWeightGuidance } from "../../domain/guidance/crossWeightGuidance";
 import {
   buildSessionCsv,

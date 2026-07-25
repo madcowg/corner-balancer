@@ -13,7 +13,7 @@ import {
   type User
 } from "firebase/auth";
 
-import { getFirebaseApp, isFirebaseConfigured, shouldUseFirebaseEmulators } from "./app";
+import { getFirebaseApp, getFirebaseRuntimeConfig, isFirebaseConfigured } from "./app";
 
 const EMAIL_STORAGE_KEY = "corner-balance/pending-email-link";
 let emulatorConnected = false;
@@ -25,12 +25,9 @@ function getFirebaseAuth() {
   }
 
   const auth = getAuth(app);
-  if (shouldUseFirebaseEmulators() && !emulatorConnected) {
-    connectAuthEmulator(
-      auth,
-      `http://${import.meta.env.VITE_FIREBASE_AUTH_EMULATOR_HOST ?? "127.0.0.1:9099"}`,
-      { disableWarnings: true }
-    );
+  const runtimeConfig = getFirebaseRuntimeConfig();
+  if (runtimeConfig?.useEmulators && !emulatorConnected) {
+    connectAuthEmulator(auth, runtimeConfig.authEmulatorUrl, { disableWarnings: true });
     emulatorConnected = true;
   }
 
@@ -73,7 +70,7 @@ export async function requestEmailLinkSignIn(email: string) {
   }
 
   await sendSignInLinkToEmail(auth, email, {
-    url: window.location.origin,
+    url: getFirebaseRuntimeConfig()?.emailLinkUrl ?? window.location.origin,
     handleCodeInApp: true
   });
   window.localStorage.setItem(EMAIL_STORAGE_KEY, email);

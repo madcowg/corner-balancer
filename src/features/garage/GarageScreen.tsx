@@ -7,9 +7,9 @@ import { InputField, SelectField, TextAreaField } from "../../components/forms/F
 import { Button } from "../../components/ui/Button";
 import { SurfaceCard } from "../../components/ui/SurfaceCard";
 import { StatusBadge } from "../../components/ui/StatusBadge";
-import { useCornerBalanceApp } from "../../app/providers";
+import { useCornerBalanceApp } from "../../app/context";
 import type { VehicleUse, CoiloverType } from "../../domain/types";
-import { buildSessionStepPath } from "../../components/ui/StepProgress";
+import { buildSessionStepPath } from "../../components/ui/buildSessionStepPath";
 
 interface GarageDraft {
   nickname: string;

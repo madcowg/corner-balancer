@@ -5,7 +5,7 @@ import {
   type Firestore
 } from "firebase/firestore";
 
-import { getFirebaseApp, isFirebaseConfigured, shouldUseFirebaseEmulators } from "./app";
+import { getFirebaseApp, getFirebaseRuntimeConfig, isFirebaseConfigured } from "./app";
 
 let firestoreInstance: Firestore | undefined;
 let emulatorConnected = false;
@@ -26,9 +26,13 @@ export function getFirebaseFirestore() {
     });
   }
 
-  if (firestoreInstance && shouldUseFirebaseEmulators() && !emulatorConnected) {
-    const [host, port] = (import.meta.env.VITE_FIREBASE_FIRESTORE_EMULATOR_HOST ?? "127.0.0.1:8080").split(":");
-    connectFirestoreEmulator(firestoreInstance, host ?? "127.0.0.1", Number(port ?? "8080"));
+  const runtimeConfig = getFirebaseRuntimeConfig();
+  if (firestoreInstance && runtimeConfig?.useEmulators && !emulatorConnected) {
+    connectFirestoreEmulator(
+      firestoreInstance,
+      runtimeConfig.firestoreEmulatorHost,
+      runtimeConfig.firestoreEmulatorPort
+    );
     emulatorConnected = true;
   }
 

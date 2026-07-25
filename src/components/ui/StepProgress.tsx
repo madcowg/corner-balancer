@@ -1,6 +1,7 @@
 import { NavLink } from "react-router-dom";
 
 import { sessionFlowSteps, type SessionFlowStep } from "../../domain/types";
+import { buildSessionStepPath } from "./buildSessionStepPath";
 
 const stepLabels: Record<SessionFlowStep, string> = {
   setup: "Setup",
@@ -17,10 +18,6 @@ const stepLabels: Record<SessionFlowStep, string> = {
 export interface StepProgressProps {
   currentStep: SessionFlowStep;
   sessionId: string;
-}
-
-export function buildSessionStepPath(sessionId: string, step: SessionFlowStep) {
-  return `/session/${sessionId}/${step}`;
 }
 
 export function StepProgress({ currentStep, sessionId }: StepProgressProps) {

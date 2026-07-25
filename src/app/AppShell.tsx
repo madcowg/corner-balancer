@@ -1,8 +1,8 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 
-import { useCornerBalanceApp } from "./providers";
 import { StepProgress } from "../components/ui/StepProgress";
 import { getRouteMeta, parseSessionRoute } from "./routes";
+import { useCornerBalanceApp } from "./context";
 
 function OfflineStatus() {
   const offline = typeof navigator !== "undefined" && navigator.onLine === false;

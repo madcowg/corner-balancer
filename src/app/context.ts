@@ -1,0 +1,89 @@
+import { createContext, useContext } from "react";
+
+import type {
+  Adjustment,
+  AdjustmentAmountUnit,
+  AdjustmentDirection,
+  AdjustmentType,
+  ChecklistRecord,
+  CoiloverType,
+  Corner,
+  Session,
+  SessionFlowStep,
+  SetupSnapshot,
+  Vehicle,
+  VehicleUse
+} from "../domain/types";
+import type { MeasurementInput, MeasurementValidationResult } from "../domain/validation/measurement";
+import type { PersistedAppState } from "../data/repositories/types";
+
+export type SaveStatus = "idle" | "saving" | "saved" | "error";
+
+export interface VehicleDraftInput {
+  nickname: string;
+  year?: number;
+  make?: string;
+  model?: string;
+  trim?: string;
+  primaryUse: VehicleUse;
+  coiloverType: CoiloverType;
+  preferredWeightUnit: Vehicle["preferredWeightUnit"];
+  preferredHeightUnit: Vehicle["preferredHeightUnit"];
+  notes?: string;
+}
+
+export interface AdjustmentDraftInput {
+  corner: Corner;
+  adjusterType: AdjustmentType;
+  direction: AdjustmentDirection;
+  amount: number;
+  amountUnit: AdjustmentAmountUnit;
+  reason: string;
+}
+
+export interface AppContextValue {
+  ready: boolean;
+  firebaseConfigured: boolean;
+  auth: PersistedAppState["auth"];
+  vehicles: Vehicle[];
+  sessions: Session[];
+  lastSessionId?: string | undefined;
+  saveStatus: SaveStatus;
+  lastSavedAt?: string | undefined;
+  error?: string | undefined;
+  getVehicle(vehicleId: string): Vehicle | undefined;
+  getSession(sessionId: string): Session | undefined;
+  setLastSessionId(sessionId?: string): void;
+  createVehicle(input: VehicleDraftInput): Vehicle;
+  updateVehicle(vehicleId: string, updates: Partial<VehicleDraftInput>): void;
+  createSession(vehicleId: string): Session | undefined;
+  updateSessionSetup(sessionId: string, updates: Partial<SetupSnapshot>): void;
+  setSessionStep(sessionId: string, step: SessionFlowStep): void;
+  updateChecklistItem(
+    sessionId: string,
+    listName: "safetyChecklist" | "finalChecklist",
+    itemId: string,
+    updates: Partial<ChecklistRecord>
+  ): void;
+  recordMeasurement(sessionId: string, input: MeasurementInput): MeasurementValidationResult;
+  logAdjustment(sessionId: string, input: AdjustmentDraftInput): Adjustment | undefined;
+  completeSession(sessionId: string, alignmentPending: boolean): void;
+  requestEmailLink(email: string): Promise<boolean>;
+  signInWithGoogle(): Promise<boolean>;
+  signInAnonymously(): Promise<boolean>;
+  signOut(): Promise<void>;
+  syncGuestDataToCloud(): Promise<boolean>;
+  clearLocalData(): Promise<void>;
+}
+
+export const CornerBalanceAppContext = createContext<AppContextValue | undefined>(undefined);
+
+export function useCornerBalanceApp() {
+  const context = useContext(CornerBalanceAppContext);
+
+  if (!context) {
+    throw new Error("useCornerBalanceApp must be used inside AppProviders.");
+  }
+
+  return context;
+}

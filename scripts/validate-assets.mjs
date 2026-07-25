@@ -1,5 +1,3 @@
-import path from "node:path";
-
 import { getProjectRoot, loadManifestEntries, validateManifestEntries } from "./asset-manifest-utils.mjs";
 
 const modeFlag = process.argv.find((argument) => argument.startsWith("--mode="));

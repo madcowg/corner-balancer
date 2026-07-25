@@ -5,7 +5,7 @@ import { CornerDiagram } from "../../components/illustrations/CornerDiagram";
 import { SelectField } from "../../components/forms/FormField";
 import { MetricCard } from "../../components/ui/MetricCard";
 import { SurfaceCard } from "../../components/ui/SurfaceCard";
-import { useCornerBalanceApp } from "../../app/providers";
+import { useCornerBalanceApp } from "../../app/context";
 
 function formatMetric(value?: number) {
   return value == null ? "--" : value.toFixed(2);

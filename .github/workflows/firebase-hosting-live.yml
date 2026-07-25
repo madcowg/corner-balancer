@@ -1,0 +1,42 @@
+name: Deploy Firebase Live
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to deploy
+        required: true
+        default: main
+
+jobs:
+  deploy_live:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    concurrency:
+      group: firebase-live
+      cancel-in-progress: false
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build release bundle
+        run: npm run build:release
+
+      - name: Deploy live channel
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_CORNER_BALANCER }}
+          projectId: ${{ vars.FIREBASE_PROJECT_ID }}
+          channelId: live

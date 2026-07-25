@@ -73,6 +73,7 @@ npm run dev
 ### Validate and test
 
 ```bash
+npm run lint
 npm test
 npm run typecheck
 npm run assets:validate
@@ -108,6 +109,7 @@ CornerBalance reads:
 - `VITE_FIREBASE_STORAGE_BUCKET`
 - `VITE_FIREBASE_MESSAGING_SENDER_ID`
 - `VITE_FIREBASE_APP_ID`
+- `VITE_FIREBASE_EMAIL_LINK_URL`
 - `VITE_USE_FIREBASE_EMULATORS`
 - `VITE_FIREBASE_AUTH_EMULATOR_HOST`
 - `VITE_FIREBASE_FIRESTORE_EMULATOR_HOST`
@@ -121,11 +123,22 @@ The repo already includes:
 - [firebase.json](/C:/Users/gabri/OneDrive/Documents/Datum/corner-balancer/firebase.json)
 - [firestore.rules](/C:/Users/gabri/OneDrive/Documents/Datum/corner-balancer/firestore.rules)
 - [firestore.indexes.json](/C:/Users/gabri/OneDrive/Documents/Datum/corner-balancer/firestore.indexes.json)
+- [.firebaserc.example](/C:/Users/gabri/OneDrive/Documents/Datum/corner-balancer/.firebaserc.example)
 
-With the Firebase CLI available, run:
+Create an untracked `.firebaserc` first:
+
+```json
+{
+  "projects": {
+    "default": "your-firebase-project-id"
+  }
+}
+```
+
+With the bundled Firebase CLI available through npm scripts, run:
 
 ```bash
-npx firebase-tools emulators:start --only auth,firestore,hosting
+npm run firebase:emulators
 ```
 
 Recommended local env values:
@@ -135,6 +148,8 @@ VITE_USE_FIREBASE_EMULATORS=true
 VITE_FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099
 VITE_FIREBASE_FIRESTORE_EMULATOR_HOST=127.0.0.1:8080
 ```
+
+If you use email-link sign-in in production, set `VITE_FIREBASE_EMAIL_LINK_URL` to your canonical app URL and make sure that URL is allowed in Firebase Authentication.
 
 ## Asset handoff workflow
 
@@ -193,15 +208,45 @@ npm test
 ### Firebase Hosting
 
 ```bash
-npm run build:release
-npx firebase-tools deploy --only hosting,firestore:rules,firestore:indexes
+npm run firebase:deploy
 ```
+
+`firebase.json` now runs `npm run build:release` as a Hosting `predeploy` hook, so every Firebase deploy enforces the approved-asset release gate automatically.
+
+### Manual preview channel deploy
+
+```bash
+npm run firebase:preview -- corner-balance-preview --expires 7d
+```
+
+### GitHub Actions deployment scaffolding
+
+The repo now includes:
+
+- [.github/workflows/ci.yml](/C:/Users/gabri/OneDrive/Documents/Datum/corner-balancer/.github/workflows/ci.yml)
+- [.github/workflows/firebase-hosting-preview.yml](/C:/Users/gabri/OneDrive/Documents/Datum/corner-balancer/.github/workflows/firebase-hosting-preview.yml)
+- [.github/workflows/firebase-hosting-live.yml](/C:/Users/gabri/OneDrive/Documents/Datum/corner-balancer/.github/workflows/firebase-hosting-live.yml)
+
+Set these GitHub repo settings before using the deployment workflows:
+
+- Repository variable: `FIREBASE_PROJECT_ID`
+- Repository secret: `FIREBASE_SERVICE_ACCOUNT_CORNER_BALANCER`
+
+The preview and live workflows are manual by default so they do not auto-deploy while the repo is still using draft placeholder artwork.
+
+### Firebase docs used for this setup
+
+- [Firebase CLI docs](https://firebase.google.com/docs/cli)
+- [Firebase Hosting GitHub integration docs](https://firebase.google.com/docs/hosting/github-integration?hl=en)
+
+Those docs currently recommend keeping `.firebaserc` local for starter or shared repos and using `firebase init hosting:github` when you want Firebase to generate its GitHub Action secret wiring automatically.
 
 ### Notes
 
-- Use `build:release` for production deployment, not plain `build`.
+- Use `npm run build:release` or `npm run firebase:deploy` for production deployment, not plain `build`.
 - The current repo ships development placeholders only; production deployment must wait for approved assets.
 - Firestore sync is additive to the local-first model. Guest work stays local until the user explicitly signs in and chooses to sync it.
+- Preview channels and live deployments use the real Firebase backend for the selected project.
 
 ## Accessibility and safety notes
 

@@ -21,12 +21,6 @@ function toneForSeverity(severity: ChecklistRecord["severity"]) {
         : "neutral";
 }
 
-export function checklistIsResolved(checklist: ChecklistRecord[]) {
-  return checklist.every(
-    (item) => item.checked || item.severity === "info" || (item.overrideReason?.trim().length ?? 0) > 0
-  );
-}
-
 export function ChecklistGroup({
   title,
   checklist,

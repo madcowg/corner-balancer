@@ -1,44 +1,27 @@
-import { getApp, getApps, initializeApp, type FirebaseApp, type FirebaseOptions } from "firebase/app";
+import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
 
-function readFirebaseConfigFromEnv(): FirebaseOptions | undefined {
-  const {
-    VITE_FIREBASE_API_KEY,
-    VITE_FIREBASE_AUTH_DOMAIN,
-    VITE_FIREBASE_PROJECT_ID,
-    VITE_FIREBASE_STORAGE_BUCKET,
-    VITE_FIREBASE_MESSAGING_SENDER_ID,
-    VITE_FIREBASE_APP_ID
-  } = import.meta.env;
-
-  if (!VITE_FIREBASE_API_KEY || !VITE_FIREBASE_AUTH_DOMAIN || !VITE_FIREBASE_PROJECT_ID || !VITE_FIREBASE_APP_ID) {
-    return undefined;
-  }
-
-  return {
-    apiKey: VITE_FIREBASE_API_KEY,
-    authDomain: VITE_FIREBASE_AUTH_DOMAIN,
-    projectId: VITE_FIREBASE_PROJECT_ID,
-    ...(VITE_FIREBASE_STORAGE_BUCKET ? { storageBucket: VITE_FIREBASE_STORAGE_BUCKET } : {}),
-    ...(VITE_FIREBASE_MESSAGING_SENDER_ID
-      ? { messagingSenderId: VITE_FIREBASE_MESSAGING_SENDER_ID }
-      : {}),
-    appId: VITE_FIREBASE_APP_ID
-  };
-}
+import { readFirebaseRuntimeConfig } from "./config";
 
 export function isFirebaseConfigured() {
-  return Boolean(readFirebaseConfigFromEnv());
+  return Boolean(readFirebaseRuntimeConfig(import.meta.env));
+}
+
+export function getFirebaseRuntimeConfig() {
+  return readFirebaseRuntimeConfig(
+    import.meta.env,
+    typeof window === "undefined" ? "http://localhost" : window.location.origin
+  );
 }
 
 export function getFirebaseApp(): FirebaseApp | undefined {
-  const config = readFirebaseConfigFromEnv();
-  if (!config) {
+  const runtimeConfig = getFirebaseRuntimeConfig();
+  if (!runtimeConfig) {
     return undefined;
   }
 
-  return getApps().length > 0 ? getApp() : initializeApp(config);
+  return getApps().length > 0 ? getApp() : initializeApp(runtimeConfig.options);
 }
 
 export function shouldUseFirebaseEmulators() {
-  return import.meta.env.VITE_USE_FIREBASE_EMULATORS === "true";
+  return getFirebaseRuntimeConfig()?.useEmulators ?? false;
 }
