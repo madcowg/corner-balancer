@@ -1,0 +1,23 @@
+{
+  "name": "CornerBalance",
+  "short_name": "CornerBalance",
+  "description": "Mobile-first corner balancing workflow assistant for workshop sessions.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F6F7F9",
+  "theme_color": "#2463A7",
+  "icons": [
+    {
+      "src": "/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

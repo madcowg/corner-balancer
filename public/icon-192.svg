@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-labelledby="title desc">
+  <title id="title">CornerBalance icon</title>
+  <desc id="desc">Stylized top-down vehicle centered over four corner pads.</desc>
+  <rect width="192" height="192" rx="42" fill="#F6F7F9" />
+  <rect x="26" y="26" width="34" height="34" rx="10" fill="#2463A7" />
+  <circle cx="149" cy="43" r="17" fill="#2463A7" />
+  <path d="M28 142l32-28 20 52H28z" fill="#2463A7" />
+  <path d="M149 114l17 16-17 16-17-16z" fill="#2463A7" />
+  <path
+    d="M70 46c0-8.837 7.163-16 16-16h20c8.837 0 16 7.163 16 16v100c0 8.837-7.163 16-16 16H86c-8.837 0-16-7.163-16-16V46z"
+    fill="#1D2633"
+  />
+  <rect x="74" y="62" width="44" height="68" rx="18" fill="#FFFFFF" opacity="0.18" />
+</svg>
