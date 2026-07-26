@@ -2,12 +2,22 @@
 export type AssetStatus = "draft" | "review" | "approved" | "deprecated";
 export type VisualAssetId = "STEP-01" | "STEP-02" | "STEP-03" | "STEP-04" | "STEP-05" | "STEP-06" | "STEP-07" | "STEP-08" | "DIAGRAM-FOUR-CORNER" | "DIAGRAM-SCALE-PAD-STATES" | "DIAGRAM-COILOVER-ARCHITECTURE" | "DIAGRAM-CROSS-WEIGHT" | "SAFETY-JACK-SUPPORT" | "SAFETY-PAD-INTERFERENCE" | "SAFETY-SWAY-LINK" | "SAFETY-TIRE-CENTERING" | "SAFETY-COLLAR-LOCK" | "SAFETY-ALIGNMENT";
 
+const normalizedBaseUrl = import.meta.env.BASE_URL.endsWith("/")
+  ? import.meta.env.BASE_URL
+  : `${import.meta.env.BASE_URL}/`;
+
+function buildAssetSrc(filename: string) {
+  return `${normalizedBaseUrl}assets/corner-balance/${filename}`;
+}
+
 export interface VisualAsset {
   id: VisualAssetId;
   filename: string;
   src: string;
   alt: string;
   aspectRatio: string;
+  masterWidthPx: number;
+  masterHeightPx: number;
   status: AssetStatus;
   category: string;
   screen: string;
@@ -20,9 +30,11 @@ export const visualAssets = {
   "STEP-01": {
     id: "STEP-01",
     filename: "steps/step-01-workspace-and-pad-plane.svg",
-    src: "/assets/corner-balance/steps/step-01-workspace-and-pad-plane.svg",
+    src: buildAssetSrc("steps/step-01-workspace-and-pad-plane.svg"),
     alt: "Workshop with four scale pads aligned in one plane and safe clearance around the scales.",
     aspectRatio: "16:9",
+    masterWidthPx: 1600,
+    masterHeightPx: 900,
     status: "draft",
     category: "step",
     screen: "workspace",
@@ -33,9 +45,11 @@ export const visualAssets = {
   "STEP-02": {
     id: "STEP-02",
     filename: "steps/step-02-ride-height-and-prechecks.svg",
-    src: "/assets/corner-balance/steps/step-02-ride-height-and-prechecks.svg",
+    src: buildAssetSrc("steps/step-02-ride-height-and-prechecks.svg"),
     alt: "Side view of the car with repeatable ride-height marks and pre-check tools staged nearby.",
     aspectRatio: "16:9",
+    masterWidthPx: 1600,
+    masterHeightPx: 900,
     status: "draft",
     category: "step",
     screen: "vehicle-prep",
@@ -46,9 +60,11 @@ export const visualAssets = {
   "STEP-03": {
     id: "STEP-03",
     filename: "steps/step-03-race-load-and-sway-bar.svg",
-    src: "/assets/corner-balance/steps/step-03-race-load-and-sway-bar.svg",
+    src: buildAssetSrc("steps/step-03-race-load-and-sway-bar.svg"),
     alt: "Top-down car with ballast and a sway-bar preparation inset showing the loaded setup condition.",
     aspectRatio: "16:9",
+    masterWidthPx: 1600,
+    masterHeightPx: 900,
     status: "draft",
     category: "step",
     screen: "session-setup",
@@ -59,9 +75,11 @@ export const visualAssets = {
   "STEP-04": {
     id: "STEP-04",
     filename: "steps/step-04-roll-on-and-center.svg",
-    src: "/assets/corner-balance/steps/step-04-roll-on-and-center.svg",
+    src: buildAssetSrc("steps/step-04-roll-on-and-center.svg"),
     alt: "Top-down view of the car rolling onto four centered scale pads with clear approach space.",
     aspectRatio: "16:9",
+    masterWidthPx: 1600,
+    masterHeightPx: 900,
     status: "draft",
     category: "step",
     screen: "baseline",
@@ -72,9 +90,11 @@ export const visualAssets = {
   "STEP-05": {
     id: "STEP-05",
     filename: "steps/step-05-settle-and-record.svg",
-    src: "/assets/corner-balance/steps/step-05-settle-and-record.svg",
+    src: buildAssetSrc("steps/step-05-settle-and-record.svg"),
     alt: "Car resting on four scales during the settling and recording process.",
     aspectRatio: "16:9",
+    masterWidthPx: 1600,
+    masterHeightPx: 900,
     status: "draft",
     category: "step",
     screen: "baseline",
@@ -85,9 +105,11 @@ export const visualAssets = {
   "STEP-06": {
     id: "STEP-06",
     filename: "steps/step-06-adjustment-and-diagonal-transfer.svg",
-    src: "/assets/corner-balance/steps/step-06-adjustment-and-diagonal-transfer.svg",
+    src: buildAssetSrc("steps/step-06-adjustment-and-diagonal-transfer.svg"),
     alt: "Split view of a coilover adjustment cutaway and the car on scales for diagonal transfer guidance.",
     aspectRatio: "16:9",
+    masterWidthPx: 1600,
+    masterHeightPx: 900,
     status: "draft",
     category: "step",
     screen: "adjustment",
@@ -98,9 +120,11 @@ export const visualAssets = {
   "STEP-07": {
     id: "STEP-07",
     filename: "steps/step-07-torque-and-neutralize.svg",
-    src: "/assets/corner-balance/steps/step-07-torque-and-neutralize.svg",
+    src: buildAssetSrc("steps/step-07-torque-and-neutralize.svg"),
     alt: "Vehicle supported at ride height with torque and sway-bar neutralization work highlighted.",
     aspectRatio: "16:9",
+    masterWidthPx: 1600,
+    masterHeightPx: 900,
     status: "draft",
     category: "step",
     screen: "finalize",
@@ -111,9 +135,11 @@ export const visualAssets = {
   "STEP-08": {
     id: "STEP-08",
     filename: "steps/step-08-final-verification-and-report.svg",
-    src: "/assets/corner-balance/steps/step-08-final-verification-and-report.svg",
+    src: buildAssetSrc("steps/step-08-final-verification-and-report.svg"),
     alt: "Final verification scene with wheel torque, alignment preparation, and report export context.",
     aspectRatio: "16:9",
+    masterWidthPx: 1600,
+    masterHeightPx: 900,
     status: "draft",
     category: "step",
     screen: "report",
@@ -124,9 +150,11 @@ export const visualAssets = {
   "DIAGRAM-FOUR-CORNER": {
     id: "DIAGRAM-FOUR-CORNER",
     filename: "diagrams/diagram-four-corner-orientation.svg",
-    src: "/assets/corner-balance/diagrams/diagram-four-corner-orientation.svg",
+    src: buildAssetSrc("diagrams/diagram-four-corner-orientation.svg"),
     alt: "Top-down car on four corner scales with the front of the car pointing upward and consistent LF RF LR RR orientation.",
     aspectRatio: "16:9",
+    masterWidthPx: 1600,
+    masterHeightPx: 900,
     status: "draft",
     category: "diagram",
     screen: "results",
@@ -137,9 +165,11 @@ export const visualAssets = {
   "DIAGRAM-SCALE-PAD-STATES": {
     id: "DIAGRAM-SCALE-PAD-STATES",
     filename: "diagrams/diagram-scale-pad-states.svg",
-    src: "/assets/corner-balance/diagrams/diagram-scale-pad-states.svg",
+    src: buildAssetSrc("diagrams/diagram-scale-pad-states.svg"),
     alt: "Three scale-pad panels comparing centered support, edge loading, and pad interference.",
     aspectRatio: "16:9",
+    masterWidthPx: 1600,
+    masterHeightPx: 900,
     status: "draft",
     category: "diagram",
     screen: "workspace",
@@ -150,9 +180,11 @@ export const visualAssets = {
   "DIAGRAM-COILOVER-ARCHITECTURE": {
     id: "DIAGRAM-COILOVER-ARCHITECTURE",
     filename: "diagrams/diagram-coilover-architecture.svg",
-    src: "/assets/corner-balance/diagrams/diagram-coilover-architecture.svg",
+    src: buildAssetSrc("diagrams/diagram-coilover-architecture.svg"),
     alt: "Comparison of spring-seat and separate lower-mount height adjustment architectures.",
     aspectRatio: "16:9",
+    masterWidthPx: 1600,
+    masterHeightPx: 900,
     status: "draft",
     category: "diagram",
     screen: "adjustment",
@@ -163,9 +195,11 @@ export const visualAssets = {
   "DIAGRAM-CROSS-WEIGHT": {
     id: "DIAGRAM-CROSS-WEIGHT",
     filename: "diagrams/diagram-cross-weight-explainer.svg",
-    src: "/assets/corner-balance/diagrams/diagram-cross-weight-explainer.svg",
+    src: buildAssetSrc("diagrams/diagram-cross-weight-explainer.svg"),
     alt: "Top-down car geometry for explaining both diagonals and the selected cross-weight convention.",
     aspectRatio: "16:9",
+    masterWidthPx: 1600,
+    masterHeightPx: 900,
     status: "draft",
     category: "diagram",
     screen: "results",
@@ -176,9 +210,11 @@ export const visualAssets = {
   "SAFETY-JACK-SUPPORT": {
     id: "SAFETY-JACK-SUPPORT",
     filename: "safety/safety-compare-jack-support.svg",
-    src: "/assets/corner-balance/safety/safety-compare-jack-support.svg",
+    src: buildAssetSrc("safety/safety-compare-jack-support.svg"),
     alt: "Safe and unsafe comparison for jack-only support versus rated stands or a lift.",
     aspectRatio: "16:9",
+    masterWidthPx: 1600,
+    masterHeightPx: 900,
     status: "draft",
     category: "safety",
     screen: "finalize",
@@ -189,9 +225,11 @@ export const visualAssets = {
   "SAFETY-PAD-INTERFERENCE": {
     id: "SAFETY-PAD-INTERFERENCE",
     filename: "safety/safety-compare-pad-interference.svg",
-    src: "/assets/corner-balance/safety/safety-compare-pad-interference.svg",
+    src: buildAssetSrc("safety/safety-compare-pad-interference.svg"),
     alt: "Safe and unsafe comparison for free scale-pad travel versus ramp or chock interference.",
     aspectRatio: "16:9",
+    masterWidthPx: 1600,
+    masterHeightPx: 900,
     status: "draft",
     category: "safety",
     screen: "workspace",
@@ -202,9 +240,11 @@ export const visualAssets = {
   "SAFETY-SWAY-LINK": {
     id: "SAFETY-SWAY-LINK",
     filename: "safety/safety-compare-sway-link.svg",
-    src: "/assets/corner-balance/safety/safety-compare-sway-link.svg",
+    src: buildAssetSrc("safety/safety-compare-sway-link.svg"),
     alt: "Safe and unsafe comparison for forced sway-bar preload versus a neutral link position.",
     aspectRatio: "16:9",
+    masterWidthPx: 1600,
+    masterHeightPx: 900,
     status: "draft",
     category: "safety",
     screen: "vehicle-prep",
@@ -215,9 +255,11 @@ export const visualAssets = {
   "SAFETY-TIRE-CENTERING": {
     id: "SAFETY-TIRE-CENTERING",
     filename: "safety/safety-compare-tire-centering.svg",
-    src: "/assets/corner-balance/safety/safety-compare-tire-centering.svg",
+    src: buildAssetSrc("safety/safety-compare-tire-centering.svg"),
     alt: "Safe and unsafe comparison for a centered tire versus a tire near the pad edge.",
     aspectRatio: "16:9",
+    masterWidthPx: 1600,
+    masterHeightPx: 900,
     status: "draft",
     category: "safety",
     screen: "baseline",
@@ -228,9 +270,11 @@ export const visualAssets = {
   "SAFETY-COLLAR-LOCK": {
     id: "SAFETY-COLLAR-LOCK",
     filename: "safety/safety-compare-collar-lock.svg",
-    src: "/assets/corner-balance/safety/safety-compare-collar-lock.svg",
+    src: buildAssetSrc("safety/safety-compare-collar-lock.svg"),
     alt: "Safe and unsafe comparison for a locked spring perch collar versus a loose collar.",
     aspectRatio: "16:9",
+    masterWidthPx: 1600,
+    masterHeightPx: 900,
     status: "draft",
     category: "safety",
     screen: "finalize",
@@ -241,9 +285,11 @@ export const visualAssets = {
   "SAFETY-ALIGNMENT": {
     id: "SAFETY-ALIGNMENT",
     filename: "safety/safety-compare-alignment.svg",
-    src: "/assets/corner-balance/safety/safety-compare-alignment.svg",
+    src: buildAssetSrc("safety/safety-compare-alignment.svg"),
     alt: "Safe and unsafe comparison for driving before alignment verification versus after verified setup.",
     aspectRatio: "16:9",
+    masterWidthPx: 1600,
+    masterHeightPx: 900,
     status: "draft",
     category: "safety",
     screen: "finalize",

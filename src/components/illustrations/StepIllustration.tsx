@@ -37,6 +37,9 @@ export function StepIllustration({
           <span className="rounded-full border border-border px-2 py-1 text-caption text-muted">
             {asset.status}
           </span>
+          <span className="rounded-full border border-border px-2 py-1 text-caption text-muted">
+            {asset.masterWidthPx} x {asset.masterHeightPx}
+          </span>
         </div>
         {caption ? <p className="text-body font-medium text-ink">{caption}</p> : null}
         <p className="text-small text-muted">{longDescription ?? asset.alt}</p>

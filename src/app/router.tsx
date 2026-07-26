@@ -2,6 +2,9 @@ import { createBrowserRouter } from "react-router-dom";
 
 import { AppShell } from "./AppShell";
 
+const routerBaseName = import.meta.env.BASE_URL.replace(/\/$/, "");
+const routerOptions = routerBaseName ? { basename: routerBaseName } : undefined;
+
 export const appRouter = createBrowserRouter([
   {
     path: "/",
@@ -81,4 +84,4 @@ export const appRouter = createBrowserRouter([
       }
     ]
   }
-]);
+], routerOptions);

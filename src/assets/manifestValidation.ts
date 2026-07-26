@@ -28,6 +28,26 @@ export function validateVisualAssetRegistry(
       issues.push({ assetId: asset.id, message: "Asset alt text is required." });
     }
 
+    if (!Number.isInteger(asset.masterWidthPx) || asset.masterWidthPx <= 0) {
+      issues.push({ assetId: asset.id, message: "Asset masterWidthPx must be a positive integer." });
+    }
+
+    if (!Number.isInteger(asset.masterHeightPx) || asset.masterHeightPx <= 0) {
+      issues.push({ assetId: asset.id, message: "Asset masterHeightPx must be a positive integer." });
+    }
+
+    const [aspectWidth = 0, aspectHeight = 0] = asset.aspectRatio.split(":").map(Number);
+    if (
+      Number.isFinite(aspectWidth) &&
+      Number.isFinite(aspectHeight) &&
+      aspectWidth * asset.masterHeightPx !== aspectHeight * asset.masterWidthPx
+    ) {
+      issues.push({
+        assetId: asset.id,
+        message: "Asset master dimensions must match the declared aspect ratio."
+      });
+    }
+
     if (asset.status === "deprecated") {
       issues.push({ assetId: asset.id, message: "Deprecated assets cannot remain in the active registry." });
     }

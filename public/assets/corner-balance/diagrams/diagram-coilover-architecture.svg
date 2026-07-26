@@ -16,6 +16,9 @@
   <text x="120" y="452" fill="#657184" font-family="Inter, Segoe UI, sans-serif" font-size="32">
     Placeholder only. Replace with the approved Figma export before release.
   </text>
+  <text x="120" y="504" fill="#657184" font-family="Inter, Segoe UI, sans-serif" font-size="28">
+    Master export size 1600 x 900
+  </text>
   <g transform="translate(120 560)">
     <rect width="1360" height="140" rx="28" fill="#F6F7F9" stroke="#D9DFE8" stroke-width="6" />
     <text x="40" y="62" fill="#1D2633" font-family="Inter, Segoe UI, sans-serif" font-size="32" font-weight="600">

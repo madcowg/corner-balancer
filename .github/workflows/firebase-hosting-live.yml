@@ -1,4 +1,4 @@
-name: Deploy Firebase Live
+name: Deploy Firebase Live (Production)
 
 on:
   workflow_dispatch:
@@ -40,3 +40,4 @@ jobs:
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_CORNER_BALANCER }}
           projectId: ${{ vars.FIREBASE_PROJECT_ID }}
           channelId: live
+          target: production

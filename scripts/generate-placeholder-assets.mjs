@@ -1,12 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import {
-  createAspectRatioStyle,
-  getAssetOutputPath,
-  getProjectRoot,
-  loadManifestEntries
-} from "./asset-manifest-utils.mjs";
+import { getAssetOutputPath, getProjectRoot, loadManifestEntries } from "./asset-manifest-utils.mjs";
 
 const projectRoot = getProjectRoot();
 const entries = loadManifestEntries(projectRoot);
@@ -14,15 +9,10 @@ const entries = loadManifestEntries(projectRoot);
 for (const entry of entries) {
   const assetPath = getAssetOutputPath(entry.filename, projectRoot);
   const outputDirectory = path.dirname(assetPath);
-  const { width, height } = createAspectRatioStyle(entry.aspect_ratio);
-  const viewWidth = 1600;
-  const viewHeight = Math.round((viewWidth * height) / width);
+  const viewWidth = Number(entry.master_width_px);
+  const viewHeight = Number(entry.master_height_px);
 
   fs.mkdirSync(outputDirectory, { recursive: true });
-
-  if (fs.existsSync(assetPath)) {
-    continue;
-  }
 
   const placeholderSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${viewWidth} ${viewHeight}" role="img" aria-labelledby="title desc">
   <title id="title">${entry.asset_id} placeholder</title>
@@ -42,6 +32,9 @@ for (const entry of entries) {
   <text x="120" y="452" fill="#657184" font-family="Inter, Segoe UI, sans-serif" font-size="32">
     Placeholder only. Replace with the approved Figma export before release.
   </text>
+  <text x="120" y="504" fill="#657184" font-family="Inter, Segoe UI, sans-serif" font-size="28">
+    Master export size ${viewWidth} x ${viewHeight}
+  </text>
   <g transform="translate(120 ${Math.min(viewHeight - 248, 560)})">
     <rect width="${viewWidth - 240}" height="140" rx="28" fill="#F6F7F9" stroke="#D9DFE8" stroke-width="6" />
     <text x="40" y="62" fill="#1D2633" font-family="Inter, Segoe UI, sans-serif" font-size="32" font-weight="600">
@@ -53,6 +46,13 @@ for (const entry of entries) {
   </g>
 </svg>
 `;
+
+  if (fs.existsSync(assetPath)) {
+    const currentAsset = fs.readFileSync(assetPath, "utf8");
+    if (!currentAsset.includes("Design asset pending")) {
+      continue;
+    }
+  }
 
   fs.writeFileSync(assetPath, placeholderSvg, "utf8");
 }

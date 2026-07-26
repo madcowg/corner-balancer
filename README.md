@@ -8,6 +8,7 @@ CornerBalance is a mobile-first React and TypeScript PWA for guided vehicle corn
 - Development assets are generated from `public/data/assets-manifest.csv` as exact-filename placeholders.
 - Signed-in users autosave locally first, then sync owned vehicles and sessions to Firestore with live refresh, cache-aware status, and remote-change conflict surfacing.
 - Vehicle profiles can be edited in place, and deletion is blocked once saved session history references that profile.
+- Placeholder-safe alpha builds are available for Firebase Hosting and GitHub Pages while final Figma exports are still pending.
 - `npm run build` succeeds for development handoff with draft placeholders.
 - `npm run build:release` is expected to fail until draft assets are replaced with approved Figma exports and marked `approved` in the manifest.
 
@@ -81,6 +82,16 @@ npm run typecheck
 npm run assets:validate
 ```
 
+### Alpha builds
+
+```bash
+npm run build:alpha
+npm run build:pages
+```
+
+`build:alpha` creates a Firebase-safe placeholder build in `dist-alpha`.  
+`build:pages` creates a GitHub Pages-ready placeholder build in `dist-pages` and adds a SPA `404.html` fallback.
+
 ### Development build
 
 ```bash
@@ -115,8 +126,13 @@ CornerBalance reads:
 - `VITE_USE_FIREBASE_EMULATORS`
 - `VITE_FIREBASE_AUTH_EMULATOR_HOST`
 - `VITE_FIREBASE_FIRESTORE_EMULATOR_HOST`
+- `VITE_BASE_PATH`
+- `VITE_GITHUB_PAGES_REPOSITORY`
 
 If the required Firebase values are absent, the app stays in guest-first local mode and disables auth actions automatically.
+
+For the normal Firebase and local alpha builds, keep `VITE_BASE_PATH=/`.  
+For GitHub Pages, the workflow sets the repo subpath automatically through the `github-pages` build mode.
 
 ## Firebase emulators
 
@@ -133,8 +149,23 @@ Create an untracked `.firebaserc` first:
 {
   "projects": {
     "default": "your-firebase-project-id"
+  },
+  "targets": {
+    "your-firebase-project-id": {
+      "hosting": {
+        "alpha": ["your-firebase-alpha-site-id"],
+        "production": ["your-firebase-project-id"]
+      }
+    }
   }
 }
+```
+
+If you prefer the CLI to generate the target mapping, use:
+
+```bash
+firebase target:apply hosting alpha your-firebase-alpha-site-id
+firebase target:apply hosting production your-firebase-project-id
 ```
 
 With the bundled Firebase CLI available through npm scripts, run:
@@ -153,6 +184,19 @@ VITE_FIREBASE_FIRESTORE_EMULATOR_HOST=127.0.0.1:8080
 
 If you use email-link sign-in in production, set `VITE_FIREBASE_EMAIL_LINK_URL` to your canonical app URL and make sure that URL is allowed in Firebase Authentication.
 
+### Firebase deployment targets
+
+```bash
+npm run firebase:deploy:alpha
+npm run firebase:preview:alpha
+npm run firebase:deploy
+npm run firebase:preview
+```
+
+- `firebase:deploy:alpha` deploys the placeholder-safe `dist-alpha` build to the Firebase Hosting target named `alpha`.
+- `firebase:deploy` deploys only the release-gated production target plus Firestore rules and indexes.
+- The repository also includes manual GitHub Actions workflows for `Deploy Firebase Alpha`, `Deploy Firebase Preview (Release Gate)`, and `Deploy Firebase Live (Production)`.
+
 ## Asset handoff workflow
 
 CornerBalance treats images as content dependencies, not structural dependencies.
@@ -163,6 +207,7 @@ CornerBalance treats images as content dependencies, not structural dependencies
 - Placeholder generator: [generate-placeholder-assets.mjs](/C:/Users/gabri/OneDrive/Documents/Datum/corner-balancer/scripts/generate-placeholder-assets.mjs)
 - Typed registry output: [manifest.generated.ts](/C:/Users/gabri/OneDrive/Documents/Datum/corner-balancer/src/assets/manifest.generated.ts)
 - Runtime registry: [registry.ts](/C:/Users/gabri/OneDrive/Documents/Datum/corner-balancer/src/assets/registry.ts)
+- Master export contract: every current asset slot uses `1600 x 900` as the placeholder-safe Figma export size and validates against the declared `16:9` aspect ratio.
 
 ### Replace placeholders with approved Figma exports
 
@@ -200,6 +245,22 @@ The current test suite covers:
 - JSON/CSV/PDF export builders
 - App shell rendering
 - Garage workflow rendering for inline profile editing and deletion locks
+
+## GitHub Pages
+
+The repo now includes a dedicated Pages workflow:
+
+- [.github/workflows/github-pages-alpha.yml](/C:/Users/gabri/OneDrive/Documents/Datum/corner-balancer/.github/workflows/github-pages-alpha.yml)
+
+It builds the placeholder-safe Pages bundle on `main` and deploys `dist-pages` through GitHub Actions.
+
+To enable it in GitHub:
+
+1. Open the repository settings.
+2. Go to `Pages`.
+3. Under `Build and deployment`, set `Source` to `GitHub Actions`.
+
+The Pages build uses the repository subpath automatically and ships a `404.html` SPA fallback so deep links continue to work.
 
 Run:
 
@@ -242,12 +303,21 @@ The preview and live workflows are manual by default so they do not auto-deploy 
 
 - [Firebase CLI docs](https://firebase.google.com/docs/cli)
 - [Firebase Hosting GitHub integration docs](https://firebase.google.com/docs/hosting/github-integration?hl=en)
+- [Firebase Hosting multisite docs](https://firebase.google.com/docs/hosting/multisites?hl=en)
+- [Firebase Hosting preview channel docs](https://firebase.google.com/docs/hosting/test-preview-deploy?hl=en)
+- [Firebase Hosting channels and versions docs](https://firebase.google.com/docs/hosting/manage-hosting-resources?hl=en)
+
+### GitHub Pages docs used for this setup
+
+- [Vite static deploy guide for GitHub Pages](https://vite.dev/guide/static-deploy)
+- [GitHub Pages custom workflow docs](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)
 
 Those docs currently recommend keeping `.firebaserc` local for starter or shared repos and using `firebase init hosting:github` when you want Firebase to generate its GitHub Action secret wiring automatically.
 
 ### Notes
 
 - Use `npm run build:release` or `npm run firebase:deploy` for production deployment, not plain `build`.
+- Use `npm run build:alpha`, `npm run firebase:deploy:alpha`, or the GitHub Pages workflow while placeholders are still in use.
 - The current repo ships development placeholders only; production deployment must wait for approved assets.
 - Firestore sync is additive to the local-first model. Guest work stays local until the user explicitly signs in and chooses to sync it.
 - Live Firestore listeners merge remote updates into the local workspace and surface when cached data or preserved local edits need attention.

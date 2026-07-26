@@ -1,5 +1,17 @@
 {
   "projects": {
     "default": "your-firebase-project-id"
+  },
+  "targets": {
+    "your-firebase-project-id": {
+      "hosting": {
+        "alpha": [
+          "your-firebase-alpha-site-id"
+        ],
+        "production": [
+          "your-firebase-project-id"
+        ]
+      }
+    }
   }
 }

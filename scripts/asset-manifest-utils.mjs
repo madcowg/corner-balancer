@@ -33,6 +33,8 @@ const REQUIRED_COLUMNS = [
   "component",
   "format",
   "aspect_ratio",
+  "master_width_px",
+  "master_height_px",
   "alt_text",
   "status",
   "figma_frame",
@@ -156,6 +158,25 @@ export function validateManifestEntries(entries, { projectRoot = getProjectRoot(
 
     if (!/^\d+:\d+$/.test(entry.aspect_ratio)) {
       errors.push(`Asset ${entry.asset_id} has invalid aspect_ratio "${entry.aspect_ratio}".`);
+    }
+
+    const masterWidth = Number(entry.master_width_px);
+    const masterHeight = Number(entry.master_height_px);
+    if (!Number.isInteger(masterWidth) || masterWidth <= 0) {
+      errors.push(`Asset ${entry.asset_id} has invalid master_width_px "${entry.master_width_px}".`);
+    }
+
+    if (!Number.isInteger(masterHeight) || masterHeight <= 0) {
+      errors.push(`Asset ${entry.asset_id} has invalid master_height_px "${entry.master_height_px}".`);
+    }
+
+    if (/^\d+:\d+$/.test(entry.aspect_ratio) && Number.isInteger(masterWidth) && Number.isInteger(masterHeight)) {
+      const [aspectWidth, aspectHeight] = entry.aspect_ratio.split(":").map(Number);
+      if (aspectWidth * masterHeight !== aspectHeight * masterWidth) {
+        errors.push(
+          `Asset ${entry.asset_id} master dimensions ${masterWidth}x${masterHeight} do not match aspect_ratio "${entry.aspect_ratio}".`
+        );
+      }
     }
 
     if (requireFiles) {

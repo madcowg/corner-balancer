@@ -22,9 +22,11 @@ const assetMap = entries
     (entry) => `  ${JSON.stringify(entry.asset_id)}: {
     id: ${JSON.stringify(entry.asset_id)},
     filename: ${JSON.stringify(entry.filename)},
-    src: ${JSON.stringify(`/assets/corner-balance/${entry.filename}`)},
+    src: buildAssetSrc(${JSON.stringify(entry.filename)}),
     alt: ${JSON.stringify(entry.alt_text)},
     aspectRatio: ${JSON.stringify(entry.aspect_ratio)},
+    masterWidthPx: ${Number(entry.master_width_px)},
+    masterHeightPx: ${Number(entry.master_height_px)},
     status: ${JSON.stringify(entry.status)},
     category: ${JSON.stringify(entry.category)},
     screen: ${JSON.stringify(entry.screen)},
@@ -39,12 +41,22 @@ const generatedSource = `/* This file is auto-generated from public/data/assets-
 export type AssetStatus = "draft" | "review" | "approved" | "deprecated";
 export type VisualAssetId = ${assetIds};
 
+const normalizedBaseUrl = import.meta.env.BASE_URL.endsWith("/")
+  ? import.meta.env.BASE_URL
+  : \`\${import.meta.env.BASE_URL}/\`;
+
+function buildAssetSrc(filename: string) {
+  return \`\${normalizedBaseUrl}assets/corner-balance/\${filename}\`;
+}
+
 export interface VisualAsset {
   id: VisualAssetId;
   filename: string;
   src: string;
   alt: string;
   aspectRatio: string;
+  masterWidthPx: number;
+  masterHeightPx: number;
   status: AssetStatus;
   category: string;
   screen: string;
