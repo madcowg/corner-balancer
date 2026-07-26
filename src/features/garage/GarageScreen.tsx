@@ -1,21 +1,22 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { useCornerBalanceApp, type VehicleDraftInput } from "../../app/context";
 import { supportingAssets } from "../../assets/registry";
 import { CornerDiagram } from "../../components/illustrations/CornerDiagram";
 import { InputField, SelectField, TextAreaField } from "../../components/forms/FormField";
-import { Button } from "../../components/ui/Button";
-import { SurfaceCard } from "../../components/ui/SurfaceCard";
-import { StatusBadge } from "../../components/ui/StatusBadge";
-import { useCornerBalanceApp } from "../../app/context";
-import type { VehicleUse, CoiloverType, Session } from "../../domain/types";
 import { buildSessionStepPath } from "../../components/ui/buildSessionStepPath";
+import { Button } from "../../components/ui/Button";
+import { StatusBadge } from "../../components/ui/StatusBadge";
+import { SurfaceCard } from "../../components/ui/SurfaceCard";
+import type { CoiloverType, Session, Vehicle, VehicleUse } from "../../domain/types";
 import {
   filterSessionsByStatus,
   getLatestNonArchivedSession,
   getSessionLaunchStep,
   type ActiveSessionFilter
 } from "../../domain/workflow/sessionHistory";
+import { getVehicleDeletionGuard } from "../../domain/workflow/vehicleManagement";
 
 interface GarageDraft {
   nickname: string;
@@ -28,6 +29,57 @@ interface GarageDraft {
   preferredWeightUnit: "lb" | "kg";
   preferredHeightUnit: "in" | "mm";
   notes: string;
+}
+
+interface GarageNotice {
+  tone: "success" | "warning" | "info";
+  text: string;
+}
+
+function createGarageDraft(overrides: Partial<GarageDraft> = {}): GarageDraft {
+  return {
+    nickname: "",
+    year: "",
+    make: "",
+    model: "",
+    trim: "",
+    primaryUse: "autocross",
+    coiloverType: "unknown",
+    preferredWeightUnit: "lb",
+    preferredHeightUnit: "in",
+    notes: "",
+    ...overrides
+  };
+}
+
+function mapVehicleToDraft(vehicle: Vehicle): GarageDraft {
+  return createGarageDraft({
+    nickname: vehicle.nickname,
+    year: vehicle.year?.toString() ?? "",
+    make: vehicle.make ?? "",
+    model: vehicle.model ?? "",
+    trim: vehicle.trim ?? "",
+    primaryUse: vehicle.primaryUse,
+    coiloverType: vehicle.coiloverType,
+    preferredWeightUnit: vehicle.preferredWeightUnit,
+    preferredHeightUnit: vehicle.preferredHeightUnit,
+    notes: vehicle.notes ?? ""
+  });
+}
+
+function toVehicleDraftInput(draft: GarageDraft): VehicleDraftInput {
+  return {
+    nickname: draft.nickname,
+    year: draft.year ? Number(draft.year) : undefined,
+    make: draft.make,
+    model: draft.model,
+    trim: draft.trim,
+    primaryUse: draft.primaryUse,
+    coiloverType: draft.coiloverType,
+    preferredWeightUnit: draft.preferredWeightUnit,
+    preferredHeightUnit: draft.preferredHeightUnit,
+    notes: draft.notes
+  };
 }
 
 function formatTimestamp(timestamp: string) {
@@ -53,58 +105,88 @@ function getSessionActionLabel(session: Session) {
     : "Resume";
 }
 
+function getNoticeClassName(tone: GarageNotice["tone"]) {
+  return tone === "success"
+    ? "border-success/20 bg-success/10 text-success"
+    : tone === "warning"
+      ? "border-warning/20 bg-warning/10 text-warning"
+      : "border-primary/20 bg-primary-tint text-primary";
+}
+
 export function GarageScreen() {
   const navigate = useNavigate();
   const app = useCornerBalanceApp();
   const [historyFilter, setHistoryFilter] = useState<ActiveSessionFilter>("all");
-  const [draft, setDraft] = useState<GarageDraft>({
-    nickname: "",
-    year: "",
-    make: "",
-    model: "",
-    trim: "",
-    primaryUse: "autocross" as VehicleUse,
-    coiloverType: "unknown" as CoiloverType,
-    preferredWeightUnit: "lb" as const,
-    preferredHeightUnit: "in" as const,
-    notes: ""
-  });
+  const [draft, setDraft] = useState<GarageDraft>(() => createGarageDraft());
+  const [editingVehicleId, setEditingVehicleId] = useState<string>();
+  const [editDraft, setEditDraft] = useState<GarageDraft>(() => createGarageDraft());
+  const [notice, setNotice] = useState<GarageNotice>();
 
   function handleCreateVehicle() {
     if (!draft.nickname.trim()) {
       return;
     }
 
-    const vehicle = app.createVehicle({
-      nickname: draft.nickname,
-      ...(draft.year ? { year: Number(draft.year) } : {}),
-      ...(draft.make ? { make: draft.make } : {}),
-      ...(draft.model ? { model: draft.model } : {}),
-      ...(draft.trim ? { trim: draft.trim } : {}),
-      primaryUse: draft.primaryUse,
-      coiloverType: draft.coiloverType,
-      preferredWeightUnit: draft.preferredWeightUnit,
-      preferredHeightUnit: draft.preferredHeightUnit,
-      ...(draft.notes ? { notes: draft.notes } : {})
-    });
+    const vehicle = app.createVehicle(toVehicleDraftInput(draft));
 
-    setDraft({
-      nickname: "",
-      year: "",
-      make: "",
-      model: "",
-      trim: "",
-      primaryUse: draft.primaryUse,
-      coiloverType: draft.coiloverType,
-      preferredWeightUnit: draft.preferredWeightUnit,
-      preferredHeightUnit: draft.preferredHeightUnit,
-      notes: ""
-    });
+    setDraft(
+      createGarageDraft({
+        primaryUse: draft.primaryUse,
+        coiloverType: draft.coiloverType,
+        preferredWeightUnit: draft.preferredWeightUnit,
+        preferredHeightUnit: draft.preferredHeightUnit
+      })
+    );
 
     const session = app.createSession(vehicle.id);
     if (session) {
       navigate(buildSessionStepPath(session.id, "setup"));
     }
+  }
+
+  function handleStartEditing(vehicle: Vehicle) {
+    setEditingVehicleId(vehicle.id);
+    setEditDraft(mapVehicleToDraft(vehicle));
+    setNotice(undefined);
+  }
+
+  function handleCancelEditing() {
+    setEditingVehicleId(undefined);
+    setEditDraft(createGarageDraft());
+  }
+
+  function handleSaveVehicle(vehicleId: string) {
+    if (!editDraft.nickname.trim()) {
+      return;
+    }
+
+    const nickname = editDraft.nickname.trim();
+    app.updateVehicle(vehicleId, toVehicleDraftInput(editDraft));
+    setEditingVehicleId(undefined);
+    setEditDraft(createGarageDraft());
+    setNotice({
+      tone: "success",
+      text: `Saved profile updates for ${nickname}.`
+    });
+  }
+
+  async function handleDeleteVehicle(vehicle: Vehicle) {
+    const result = await app.deleteVehicle(vehicle.id);
+
+    if (!result.ok) {
+      setNotice({
+        tone: "warning",
+        text: result.reason ?? `Unable to delete ${vehicle.nickname}.`
+      });
+      return;
+    }
+
+    setEditingVehicleId((current) => (current === vehicle.id ? undefined : current));
+    setEditDraft(createGarageDraft());
+    setNotice({
+      tone: result.message ? "warning" : "success",
+      text: result.message ?? `Deleted the empty profile for ${vehicle.nickname}.`
+    });
   }
 
   const filteredSessions = filterSessionsByStatus(app.sessions, historyFilter);
@@ -165,7 +247,9 @@ export function GarageScreen() {
               }
             >
               <option value="unknown">Unknown</option>
-              <option value="single_adjuster_spring_perch">Spring perch adjusts load/height together</option>
+              <option value="single_adjuster_spring_perch">
+                Spring perch adjusts load/height together
+              </option>
               <option value="separate_height_and_preload">Separate height and preload</option>
               <option value="non_coilover_adjustable">Non-coilover adjustable</option>
             </SelectField>
@@ -212,6 +296,17 @@ export function GarageScreen() {
         </SurfaceCard>
 
         <SurfaceCard title="Saved vehicles" eyebrow="Garage">
+          {notice ? (
+            <div
+              role="status"
+              aria-live="polite"
+              className={`mt-4 rounded-2xl border px-3 py-3 text-small font-medium ${getNoticeClassName(
+                notice.tone
+              )}`}
+            >
+              {notice.text}
+            </div>
+          ) : null}
           {app.vehicles.length === 0 ? (
             <p className="mt-2 text-body text-muted">
               Your garage is empty. Add the first vehicle above to start a session.
@@ -219,9 +314,7 @@ export function GarageScreen() {
           ) : (
             <ul className="mt-4 space-y-3">
               {app.vehicles.map((vehicle) => {
-                const vehicleSessions = app.sessions.filter(
-                  (session) => session.vehicleId === vehicle.id
-                );
+                const vehicleSessions = app.sessions.filter((session) => session.vehicleId === vehicle.id);
                 const latestLiveSession = getLatestNonArchivedSession(vehicleSessions);
                 const latestSession = vehicleSessions
                   .slice()
@@ -236,6 +329,8 @@ export function GarageScreen() {
                 const archivedCount = vehicleSessions.filter(
                   (session) => session.status === "archived"
                 ).length;
+                const deletionGuard = getVehicleDeletionGuard(vehicle.id, app.sessions);
+                const editing = editingVehicleId === vehicle.id;
 
                 return (
                   <li key={vehicle.id} className="rounded-2xl border border-border bg-canvas p-4">
@@ -255,9 +350,7 @@ export function GarageScreen() {
                           <StatusBadge tone="success">{completedCount} completed</StatusBadge>
                           <StatusBadge tone="neutral">{archivedCount} archived</StatusBadge>
                         </div>
-                        {vehicle.notes ? (
-                          <p className="text-small text-muted">{vehicle.notes}</p>
-                        ) : null}
+                        {vehicle.notes ? <p className="text-small text-muted">{vehicle.notes}</p> : null}
                         {latestSession ? (
                           <p className="text-small text-muted">
                             Latest session updated {formatTimestamp(latestSession.updatedAt)}.
@@ -265,6 +358,17 @@ export function GarageScreen() {
                         ) : (
                           <p className="text-small text-muted">
                             No sessions saved for this vehicle yet.
+                          </p>
+                        )}
+                        {!deletionGuard.canDelete ? (
+                          <p className="text-small text-warning">
+                            Delete locked while {deletionGuard.relatedSessionCount} saved session
+                            {deletionGuard.relatedSessionCount === 1 ? "" : "s"} still reference this
+                            profile.
+                          </p>
+                        ) : (
+                          <p className="text-small text-muted">
+                            Empty profiles can be deleted safely before they accumulate history.
                           </p>
                         )}
                       </div>
@@ -307,8 +411,163 @@ export function GarageScreen() {
                         >
                           Start fresh session
                         </Button>
+                        <Button variant="secondary" onClick={() => handleStartEditing(vehicle)}>
+                          Edit profile
+                        </Button>
+                        <Button
+                          variant="danger"
+                          disabled={!deletionGuard.canDelete}
+                          title={deletionGuard.reason}
+                          onClick={() => void handleDeleteVehicle(vehicle)}
+                        >
+                          Delete empty profile
+                        </Button>
                       </div>
                     </div>
+                    {editing ? (
+                      <div className="mt-4 rounded-2xl border border-border bg-white p-4">
+                        <p className="text-small font-semibold uppercase tracking-[0.12em] text-primary">
+                          Edit vehicle profile
+                        </p>
+                        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                          <InputField
+                            label="Nickname"
+                            value={editDraft.nickname}
+                            onChange={(event) =>
+                              setEditDraft((current) => ({
+                                ...current,
+                                nickname: event.target.value
+                              }))
+                            }
+                          />
+                          <InputField
+                            label="Year"
+                            inputMode="numeric"
+                            value={editDraft.year}
+                            onChange={(event) =>
+                              setEditDraft((current) => ({
+                                ...current,
+                                year: event.target.value
+                              }))
+                            }
+                          />
+                          <InputField
+                            label="Make"
+                            value={editDraft.make}
+                            onChange={(event) =>
+                              setEditDraft((current) => ({
+                                ...current,
+                                make: event.target.value
+                              }))
+                            }
+                          />
+                          <InputField
+                            label="Model"
+                            value={editDraft.model}
+                            onChange={(event) =>
+                              setEditDraft((current) => ({
+                                ...current,
+                                model: event.target.value
+                              }))
+                            }
+                          />
+                          <InputField
+                            label="Trim"
+                            value={editDraft.trim}
+                            onChange={(event) =>
+                              setEditDraft((current) => ({
+                                ...current,
+                                trim: event.target.value
+                              }))
+                            }
+                          />
+                          <SelectField
+                            label="Primary use"
+                            value={editDraft.primaryUse}
+                            onChange={(event) =>
+                              setEditDraft((current) => ({
+                                ...current,
+                                primaryUse: event.target.value as VehicleUse
+                              }))
+                            }
+                          >
+                            <option value="autocross">Autocross</option>
+                            <option value="road_course">Road course</option>
+                            <option value="street">Street</option>
+                            <option value="other">Other</option>
+                          </SelectField>
+                          <SelectField
+                            label="Coilover architecture"
+                            value={editDraft.coiloverType}
+                            onChange={(event) =>
+                              setEditDraft((current) => ({
+                                ...current,
+                                coiloverType: event.target.value as CoiloverType
+                              }))
+                            }
+                          >
+                            <option value="unknown">Unknown</option>
+                            <option value="single_adjuster_spring_perch">
+                              Spring perch adjusts load/height together
+                            </option>
+                            <option value="separate_height_and_preload">
+                              Separate height and preload
+                            </option>
+                            <option value="non_coilover_adjustable">Non-coilover adjustable</option>
+                          </SelectField>
+                          <SelectField
+                            label="Weight unit"
+                            value={editDraft.preferredWeightUnit}
+                            onChange={(event) =>
+                              setEditDraft((current) => ({
+                                ...current,
+                                preferredWeightUnit: event.target.value as "lb" | "kg"
+                              }))
+                            }
+                          >
+                            <option value="lb">Pounds</option>
+                            <option value="kg">Kilograms</option>
+                          </SelectField>
+                          <SelectField
+                            label="Height unit"
+                            value={editDraft.preferredHeightUnit}
+                            onChange={(event) =>
+                              setEditDraft((current) => ({
+                                ...current,
+                                preferredHeightUnit: event.target.value as "in" | "mm"
+                              }))
+                            }
+                          >
+                            <option value="in">Inches</option>
+                            <option value="mm">Millimeters</option>
+                          </SelectField>
+                        </div>
+                        <div className="mt-4">
+                          <TextAreaField
+                            label="Vehicle notes"
+                            value={editDraft.notes}
+                            onChange={(event) =>
+                              setEditDraft((current) => ({
+                                ...current,
+                                notes: event.target.value
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="mt-4 flex flex-wrap justify-end gap-2">
+                          <Button variant="text" onClick={handleCancelEditing}>
+                            Cancel
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            disabled={!editDraft.nickname.trim()}
+                            onClick={() => handleSaveVehicle(vehicle.id)}
+                          >
+                            Save changes
+                          </Button>
+                        </div>
+                      </div>
+                    ) : null}
                   </li>
                 );
               })}
@@ -334,9 +593,7 @@ export function GarageScreen() {
             </div>
           </div>
           {filteredSessions.length === 0 ? (
-            <p className="mt-4 text-body text-muted">
-              No sessions match the current filter yet.
-            </p>
+            <p className="mt-4 text-body text-muted">No sessions match the current filter yet.</p>
           ) : (
             <ul className="mt-4 space-y-3">
               {filteredSessions.map((session) => {
@@ -369,10 +626,7 @@ export function GarageScreen() {
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {session.status === "archived" ? (
-                            <Button
-                              variant="secondary"
-                              onClick={() => app.restoreSession(session.id)}
-                            >
+                            <Button variant="secondary" onClick={() => app.restoreSession(session.id)}>
                               Restore
                             </Button>
                           ) : (
@@ -381,19 +635,13 @@ export function GarageScreen() {
                                 variant="secondary"
                                 onClick={() =>
                                   navigate(
-                                    buildSessionStepPath(
-                                      session.id,
-                                      getSessionLaunchStep(session)
-                                    )
+                                    buildSessionStepPath(session.id, getSessionLaunchStep(session))
                                   )
                                 }
                               >
                                 {getSessionActionLabel(session)}
                               </Button>
-                              <Button
-                                variant="text"
-                                onClick={() => app.archiveSession(session.id)}
-                              >
+                              <Button variant="text" onClick={() => app.archiveSession(session.id)}>
                                 Archive
                               </Button>
                             </>

@@ -6,7 +6,8 @@ CornerBalance is a mobile-first React and TypeScript PWA for guided vehicle corn
 
 - The full guided workflow is implemented from garage through report preview and JSON/CSV/PDF export.
 - Development assets are generated from `public/data/assets-manifest.csv` as exact-filename placeholders.
-- Signed-in users autosave locally first and then sync owned vehicles and sessions to Firestore in the background.
+- Signed-in users autosave locally first, then sync owned vehicles and sessions to Firestore with live refresh, cache-aware status, and remote-change conflict surfacing.
+- Vehicle profiles can be edited in place, and deletion is blocked once saved session history references that profile.
 - `npm run build` succeeds for development handoff with draft placeholders.
 - `npm run build:release` is expected to fail until draft assets are replaced with approved Figma exports and marked `approved` in the manifest.
 
@@ -194,9 +195,11 @@ The current test suite covers:
 - Measurement validation and warnings
 - Qualitative guidance
 - Session flow helpers
+- Signed-in merge and deletion guard helpers
 - Asset registry validation
 - JSON/CSV/PDF export builders
 - App shell rendering
+- Garage workflow rendering for inline profile editing and deletion locks
 
 Run:
 
@@ -247,6 +250,7 @@ Those docs currently recommend keeping `.firebaserc` local for starter or shared
 - Use `npm run build:release` or `npm run firebase:deploy` for production deployment, not plain `build`.
 - The current repo ships development placeholders only; production deployment must wait for approved assets.
 - Firestore sync is additive to the local-first model. Guest work stays local until the user explicitly signs in and chooses to sync it.
+- Live Firestore listeners merge remote updates into the local workspace and surface when cached data or preserved local edits need attention.
 - Preview channels and live deployments use the real Firebase backend for the selected project.
 
 ## Accessibility and safety notes

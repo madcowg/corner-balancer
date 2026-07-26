@@ -18,18 +18,28 @@ import type { MeasurementInput, MeasurementValidationResult } from "../domain/va
 import type { PersistedAppState } from "../data/repositories/types";
 
 export type SaveStatus = "idle" | "saving" | "saved" | "sync_pending" | "error";
+export type CloudSyncStatus =
+  | "local_only"
+  | "connecting"
+  | "waiting_for_guest_sync"
+  | "syncing"
+  | "using_cache"
+  | "synced"
+  | "remote_update"
+  | "conflict"
+  | "error";
 
 export interface VehicleDraftInput {
   nickname: string;
-  year?: number;
-  make?: string;
-  model?: string;
-  trim?: string;
+  year?: number | undefined;
+  make?: string | undefined;
+  model?: string | undefined;
+  trim?: string | undefined;
   primaryUse: VehicleUse;
   coiloverType: CoiloverType;
   preferredWeightUnit: Vehicle["preferredWeightUnit"];
   preferredHeightUnit: Vehicle["preferredHeightUnit"];
-  notes?: string;
+  notes?: string | undefined;
 }
 
 export interface AdjustmentDraftInput {
@@ -41,6 +51,12 @@ export interface AdjustmentDraftInput {
   reason: string;
 }
 
+export interface DeleteVehicleResult {
+  ok: boolean;
+  reason?: string | undefined;
+  message?: string | undefined;
+}
+
 export interface AppContextValue {
   ready: boolean;
   firebaseConfigured: boolean;
@@ -49,13 +65,17 @@ export interface AppContextValue {
   sessions: Session[];
   lastSessionId?: string | undefined;
   saveStatus: SaveStatus;
+  cloudSyncStatus: CloudSyncStatus;
+  cloudSyncMessage?: string | undefined;
   lastSavedAt?: string | undefined;
+  lastCloudSyncAt?: string | undefined;
   error?: string | undefined;
   getVehicle(vehicleId: string): Vehicle | undefined;
   getSession(sessionId: string): Session | undefined;
   setLastSessionId(sessionId?: string): void;
   createVehicle(input: VehicleDraftInput): Vehicle;
   updateVehicle(vehicleId: string, updates: Partial<VehicleDraftInput>): void;
+  deleteVehicle(vehicleId: string): Promise<DeleteVehicleResult>;
   createSession(vehicleId: string): Session | undefined;
   createSessionFromTemplate(sessionId: string): Session | undefined;
   archiveSession(sessionId: string): void;

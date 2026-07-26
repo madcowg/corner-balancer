@@ -1,20 +1,22 @@
 import type { PropsWithChildren } from "react";
-import {
-  startTransition,
-  useEffect,
-  useMemo,
-  useRef,
-  useState
-} from "react";
+import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 
-import type { Adjustment, Measurement, SetupSnapshot, Vehicle } from "../domain/types";
-import { getNextSessionFlowStep } from "../domain/workflow/sessionFlow";
-import { getLatestNonArchivedSession, getRestoredSessionStatus } from "../domain/workflow/sessionHistory";
-import { validateMeasurementInput } from "../domain/validation/measurement";
-import { LocalAppRepository } from "../data/local/localAppRepository";
-import type { PersistedAppState } from "../data/repositories/types";
-import { createDefaultPersistedState } from "../data/migrations/appState";
 import { remapGuestDataToUser } from "../data/firebase/cloudState";
+import {
+  buildComparableStateFingerprint,
+  mergeSignedInAppState
+} from "../data/firebase/liveSync";
+import { LocalAppRepository } from "../data/local/localAppRepository";
+import { createDefaultPersistedState } from "../data/migrations/appState";
+import type { PersistedAppState } from "../data/repositories/types";
+import type { Adjustment, Measurement, SetupSnapshot, Vehicle } from "../domain/types";
+import { validateMeasurementInput } from "../domain/validation/measurement";
+import { getNextSessionFlowStep } from "../domain/workflow/sessionFlow";
+import {
+  getLatestNonArchivedSession,
+  getRestoredSessionStatus
+} from "../domain/workflow/sessionHistory";
+import { getVehicleDeletionGuard } from "../domain/workflow/vehicleManagement";
 import {
   createGuestOwnerId,
   createNewSession,
@@ -24,6 +26,7 @@ import { isFirebaseConfigured } from "../firebase/app";
 import { CornerBalanceAppContext } from "./context";
 import {
   type AppContextValue,
+  type CloudSyncStatus,
   type SaveStatus,
   type VehicleDraftInput
 } from "./context";
@@ -32,9 +35,13 @@ interface AppRuntimeState {
   ready: boolean;
   data: PersistedAppState;
   saveStatus: SaveStatus;
+  cloudSyncStatus: CloudSyncStatus;
+  cloudSyncMessage?: string | undefined;
   lastSavedAt?: string | undefined;
+  lastCloudSyncAt?: string | undefined;
   error?: string | undefined;
 }
+
 const repository = new LocalAppRepository();
 const firebaseConfigured = isFirebaseConfigured();
 
@@ -42,11 +49,8 @@ function createTimestamp() {
   return new Date().toISOString();
 }
 
-function mergeById<T extends { id: string }>(localItems: T[], remoteItems: T[]) {
-  const merged = new Map<string, T>();
-  remoteItems.forEach((item) => merged.set(item.id, item));
-  localItems.forEach((item) => merged.set(item.id, item));
-  return [...merged.values()];
+function hasOwnProperty<T extends object>(value: T, key: keyof T) {
+  return Object.prototype.hasOwnProperty.call(value, key);
 }
 
 function getLatestLiveSessionId(sessions: PersistedAppState["sessions"]) {
@@ -61,24 +65,83 @@ async function loadFirestoreRepositoryModule() {
   return import("../data/firebase/firestoreAppRepository");
 }
 
-function compactVehicleUpdates(
-  updates: Partial<VehicleDraftInput>
-): Partial<Vehicle> {
+function applyVehicleUpdates(vehicle: Vehicle, updates: Partial<VehicleDraftInput>): Vehicle {
+  const nextVehicle: Vehicle = { ...vehicle };
+
+  if (hasOwnProperty(updates, "nickname") && updates.nickname !== undefined) {
+    const nickname = updates.nickname.trim();
+    nextVehicle.nickname = nickname || vehicle.nickname;
+  }
+
+  if (hasOwnProperty(updates, "year")) {
+    if (typeof updates.year === "number" && Number.isFinite(updates.year)) {
+      nextVehicle.year = updates.year;
+    } else {
+      delete nextVehicle.year;
+    }
+  }
+
+  if (hasOwnProperty(updates, "make")) {
+    const make = updates.make?.trim();
+    if (make) {
+      nextVehicle.make = make;
+    } else {
+      delete nextVehicle.make;
+    }
+  }
+
+  if (hasOwnProperty(updates, "model")) {
+    const model = updates.model?.trim();
+    if (model) {
+      nextVehicle.model = model;
+    } else {
+      delete nextVehicle.model;
+    }
+  }
+
+  if (hasOwnProperty(updates, "trim")) {
+    const trim = updates.trim?.trim();
+    if (trim) {
+      nextVehicle.trim = trim;
+    } else {
+      delete nextVehicle.trim;
+    }
+  }
+
+  if (hasOwnProperty(updates, "primaryUse") && updates.primaryUse !== undefined) {
+    nextVehicle.primaryUse = updates.primaryUse;
+  }
+
+  if (hasOwnProperty(updates, "coiloverType") && updates.coiloverType !== undefined) {
+    nextVehicle.coiloverType = updates.coiloverType;
+  }
+
+  if (
+    hasOwnProperty(updates, "preferredWeightUnit") &&
+    updates.preferredWeightUnit !== undefined
+  ) {
+    nextVehicle.preferredWeightUnit = updates.preferredWeightUnit;
+  }
+
+  if (
+    hasOwnProperty(updates, "preferredHeightUnit") &&
+    updates.preferredHeightUnit !== undefined
+  ) {
+    nextVehicle.preferredHeightUnit = updates.preferredHeightUnit;
+  }
+
+  if (hasOwnProperty(updates, "notes")) {
+    const notes = updates.notes?.trim();
+    if (notes) {
+      nextVehicle.notes = notes;
+    } else {
+      delete nextVehicle.notes;
+    }
+  }
+
   return {
-    ...(updates.nickname !== undefined ? { nickname: updates.nickname } : {}),
-    ...(updates.year !== undefined ? { year: updates.year } : {}),
-    ...(updates.make !== undefined ? { make: updates.make } : {}),
-    ...(updates.model !== undefined ? { model: updates.model } : {}),
-    ...(updates.trim !== undefined ? { trim: updates.trim } : {}),
-    ...(updates.primaryUse !== undefined ? { primaryUse: updates.primaryUse } : {}),
-    ...(updates.coiloverType !== undefined ? { coiloverType: updates.coiloverType } : {}),
-    ...(updates.preferredWeightUnit !== undefined
-      ? { preferredWeightUnit: updates.preferredWeightUnit }
-      : {}),
-    ...(updates.preferredHeightUnit !== undefined
-      ? { preferredHeightUnit: updates.preferredHeightUnit }
-      : {}),
-    ...(updates.notes !== undefined ? { notes: updates.notes } : {})
+    ...nextVehicle,
+    updatedAt: createTimestamp()
   };
 }
 
@@ -107,7 +170,9 @@ function compactSetupUpdates(updates: Partial<SetupSnapshot>): Partial<SetupSnap
       ? { driverOrBallastKg: updates.driverOrBallastKg }
       : {}),
     ...(updates.fuelDescription !== undefined ? { fuelDescription: updates.fuelDescription } : {}),
-    ...(updates.equipmentNotes !== undefined ? { equipmentNotes: updates.equipmentNotes } : {}),
+    ...(updates.equipmentNotes !== undefined
+      ? { equipmentNotes: updates.equipmentNotes }
+      : {}),
     ...(updates.tirePressuresPsi !== undefined
       ? { tirePressuresPsi: updates.tirePressuresPsi }
       : {}),
@@ -119,14 +184,99 @@ function compactSetupUpdates(updates: Partial<SetupSnapshot>): Partial<SetupSnap
   };
 }
 
+function filterRemoteStateForPendingVehicleDeletions(
+  state: PersistedAppState,
+  pendingDeletedVehicleIds: Set<string>
+) {
+  if (pendingDeletedVehicleIds.size === 0) {
+    return state;
+  }
+
+  const vehicles = state.vehicles.filter((vehicle) => !pendingDeletedVehicleIds.has(vehicle.id));
+  const sessions = state.sessions.filter(
+    (session) => !pendingDeletedVehicleIds.has(session.vehicleId)
+  );
+  const lastSessionId =
+    state.lastSessionId && sessions.some((session) => session.id === state.lastSessionId)
+      ? state.lastSessionId
+      : getLatestLiveSessionId(sessions);
+
+  return {
+    ...state,
+    vehicles,
+    sessions,
+    lastSessionId
+  };
+}
+
+function getGuestSyncMessage() {
+  return "Guest data is still local. Choose sync when you want to merge it into Firestore.";
+}
+
+function getCloudSyncDescriptor({
+  pendingGuestSync,
+  hasPendingWrites,
+  fromCache,
+  remoteChangesApplied,
+  localChangesPreserved
+}: {
+  pendingGuestSync: boolean;
+  hasPendingWrites: boolean;
+  fromCache: boolean;
+  remoteChangesApplied: number;
+  localChangesPreserved: number;
+}) {
+  if (pendingGuestSync) {
+    return {
+      status: "waiting_for_guest_sync" as const,
+      message: getGuestSyncMessage()
+    };
+  }
+
+  if (hasPendingWrites) {
+    return {
+      status: "syncing" as const,
+      message: "Syncing changes to Firestore."
+    };
+  }
+
+  if (fromCache) {
+    return {
+      status: "using_cache" as const,
+      message: "Using Firestore cache until the network confirms the latest state."
+    };
+  }
+
+  if (localChangesPreserved > 0) {
+    return {
+      status: "conflict" as const,
+      message: "Remote differences were detected. Newer local edits were preserved."
+    };
+  }
+
+  if (remoteChangesApplied > 0) {
+    return {
+      status: "remote_update" as const,
+      message: "Changes from another device were merged into this workspace."
+    };
+  }
+
+  return {
+    status: "synced" as const,
+    message: "Firestore sync is current."
+  };
+}
+
 export function AppProviders({ children }: PropsWithChildren) {
   const [state, setState] = useState<AppRuntimeState>({
     ready: false,
     data: createDefaultPersistedState(),
-    saveStatus: "idle"
+    saveStatus: "idle",
+    cloudSyncStatus: "local_only"
   });
   const loadedRef = useRef(false);
   const autosaveRunIdRef = useRef(0);
+  const pendingDeletedVehicleIdsRef = useRef(new Set<string>());
 
   useEffect(() => {
     let cancelled = false;
@@ -140,7 +290,8 @@ export function AppProviders({ children }: PropsWithChildren) {
       setState({
         ready: true,
         data,
-        saveStatus: "idle"
+        saveStatus: "idle",
+        cloudSyncStatus: "local_only"
       });
     });
 
@@ -174,6 +325,7 @@ export function AppProviders({ children }: PropsWithChildren) {
 
       unsubscribe = observeFirebaseAuth(async (user) => {
         if (!user) {
+          pendingDeletedVehicleIdsRef.current.clear();
           setState((current) => ({
             ...current,
             data: {
@@ -185,7 +337,10 @@ export function AppProviders({ children }: PropsWithChildren) {
                     : "signed_out",
                 pendingGuestSync: false
               }
-            }
+            },
+            cloudSyncStatus: "local_only",
+            cloudSyncMessage: undefined,
+            lastCloudSyncAt: undefined
           }));
           return;
         }
@@ -199,22 +354,42 @@ export function AppProviders({ children }: PropsWithChildren) {
           const hasGuestData =
             current.data.vehicles.some((vehicle) => vehicle.ownerId === guestOwnerId) ||
             current.data.sessions.some((session) => session.ownerId === guestOwnerId);
+          const nextAuth = {
+            mode: "signed_in" as const,
+            uid: user.uid,
+            ...(user.email ? { email: user.email } : {}),
+            ...(user.displayName ? { displayName: user.displayName } : {}),
+            pendingGuestSync: hasGuestData
+          };
+
+          if (hasGuestData) {
+            return {
+              ...current,
+              data: {
+                ...current.data,
+                auth: nextAuth
+              },
+              cloudSyncStatus: "waiting_for_guest_sync",
+              cloudSyncMessage: getGuestSyncMessage()
+            };
+          }
+
+          const mergedState = mergeSignedInAppState(
+            {
+              ...current.data,
+              auth: nextAuth
+            },
+            cloudState
+          ).mergedState;
 
           return {
             ...current,
             data: {
-              ...current.data,
-              auth: {
-                mode: "signed_in",
-                uid: user.uid,
-                ...(user.email ? { email: user.email } : {}),
-                ...(user.displayName ? { displayName: user.displayName } : {}),
-                pendingGuestSync: hasGuestData
-              },
-              vehicles: hasGuestData ? current.data.vehicles : cloudState.vehicles,
-              sessions: hasGuestData ? current.data.sessions : cloudState.sessions,
-              lastSessionId: hasGuestData ? current.data.lastSessionId : cloudState.lastSessionId
-            }
+              ...mergedState,
+              auth: nextAuth
+            },
+            cloudSyncStatus: "connecting",
+            cloudSyncMessage: "Connecting to Firestore."
           };
         });
       });
@@ -225,6 +400,169 @@ export function AppProviders({ children }: PropsWithChildren) {
       unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (
+      !firebaseConfigured ||
+      !state.ready ||
+      state.data.auth.mode !== "signed_in" ||
+      !state.data.auth.uid
+    ) {
+      return;
+    }
+
+    const uid = state.data.auth.uid;
+    let unsubscribe = () => {};
+    let cancelled = false;
+
+    setState((current) => ({
+      ...current,
+      cloudSyncStatus: current.data.auth.pendingGuestSync
+        ? "waiting_for_guest_sync"
+        : "connecting",
+      cloudSyncMessage: current.data.auth.pendingGuestSync
+        ? getGuestSyncMessage()
+        : "Connecting to Firestore."
+    }));
+
+    void loadFirestoreRepositoryModule().then(({ FirestoreAppRepository }) => {
+      if (cancelled) {
+        return;
+      }
+
+      const cloudRepository = new FirestoreAppRepository(uid);
+      unsubscribe = cloudRepository.observe(
+        (snapshot) => {
+          if (cancelled) {
+            return;
+          }
+
+          startTransition(() => {
+            setState((current) => {
+              if (current.data.auth.mode !== "signed_in" || current.data.auth.uid !== uid) {
+                return current;
+              }
+
+              pendingDeletedVehicleIdsRef.current.forEach((vehicleId) => {
+                if (!snapshot.state.vehicles.some((vehicle) => vehicle.id === vehicleId)) {
+                  pendingDeletedVehicleIdsRef.current.delete(vehicleId);
+                }
+              });
+
+              const remoteState = filterRemoteStateForPendingVehicleDeletions(
+                snapshot.state,
+                pendingDeletedVehicleIdsRef.current
+              );
+
+              if (current.data.auth.pendingGuestSync) {
+                const nextSaveStatus =
+                  current.saveStatus === "sync_pending" &&
+                  !snapshot.hasPendingWrites &&
+                  !snapshot.fromCache
+                    ? "saved"
+                    : current.saveStatus;
+                const nextError =
+                  current.saveStatus === "sync_pending" && nextSaveStatus === "saved"
+                    ? undefined
+                    : current.error;
+                const nextCloudSyncAt = snapshot.updatedAt ?? current.lastCloudSyncAt;
+
+                if (
+                  current.cloudSyncStatus === "waiting_for_guest_sync" &&
+                  current.cloudSyncMessage === getGuestSyncMessage() &&
+                  current.lastCloudSyncAt === nextCloudSyncAt &&
+                  current.saveStatus === nextSaveStatus &&
+                  current.error === nextError
+                ) {
+                  return current;
+                }
+
+                return {
+                  ...current,
+                  cloudSyncStatus: "waiting_for_guest_sync",
+                  cloudSyncMessage: getGuestSyncMessage(),
+                  lastCloudSyncAt: nextCloudSyncAt,
+                  saveStatus: nextSaveStatus,
+                  error: nextError
+                };
+              }
+
+              const mergeResult = mergeSignedInAppState(current.data, remoteState);
+              const nextData = {
+                ...mergeResult.mergedState,
+                auth: current.data.auth
+              };
+              const nextCloudSyncAt = snapshot.updatedAt ?? current.lastCloudSyncAt;
+              const descriptor = getCloudSyncDescriptor({
+                pendingGuestSync: false,
+                hasPendingWrites: snapshot.hasPendingWrites,
+                fromCache: snapshot.fromCache,
+                remoteChangesApplied: mergeResult.remoteChangesApplied,
+                localChangesPreserved: mergeResult.localChangesPreserved
+              });
+              const nextSaveStatus =
+                current.saveStatus === "sync_pending" &&
+                !snapshot.hasPendingWrites &&
+                !snapshot.fromCache
+                  ? "saved"
+                  : current.saveStatus;
+              const nextError =
+                current.saveStatus === "sync_pending" && nextSaveStatus === "saved"
+                  ? undefined
+                  : current.error;
+              const dataChanged =
+                buildComparableStateFingerprint(current.data) !==
+                buildComparableStateFingerprint(nextData);
+
+              if (
+                !dataChanged &&
+                current.cloudSyncStatus === descriptor.status &&
+                current.cloudSyncMessage === descriptor.message &&
+                current.lastCloudSyncAt === nextCloudSyncAt &&
+                current.saveStatus === nextSaveStatus &&
+                current.error === nextError
+              ) {
+                return current;
+              }
+
+              return {
+                ...current,
+                data: dataChanged ? nextData : current.data,
+                cloudSyncStatus: descriptor.status,
+                cloudSyncMessage: descriptor.message,
+                lastCloudSyncAt: nextCloudSyncAt,
+                saveStatus: nextSaveStatus,
+                error: nextError
+              };
+            });
+          });
+        },
+        (error) => {
+          if (cancelled) {
+            return;
+          }
+
+          const message =
+            error.message || "Saved locally, but the Firestore listener needs attention.";
+
+          startTransition(() => {
+            setState((current) => ({
+              ...current,
+              saveStatus: current.saveStatus === "error" ? current.saveStatus : "sync_pending",
+              cloudSyncStatus: "error",
+              cloudSyncMessage: message,
+              error: message
+            }));
+          });
+        }
+      );
+    });
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [state.data.auth.mode, state.data.auth.pendingGuestSync, state.data.auth.uid, state.ready]);
 
   useEffect(() => {
     if (!state.ready || !loadedRef.current) {
@@ -260,6 +598,25 @@ export function AppProviders({ children }: PropsWithChildren) {
             return;
           }
 
+          if (state.data.auth.pendingGuestSync) {
+            startTransition(() => {
+              setState((current) => ({
+                ...current,
+                cloudSyncStatus: "waiting_for_guest_sync",
+                cloudSyncMessage: getGuestSyncMessage()
+              }));
+            });
+            return;
+          }
+
+          startTransition(() => {
+            setState((current) => ({
+              ...current,
+              cloudSyncStatus: "syncing",
+              cloudSyncMessage: "Syncing changes to Firestore."
+            }));
+          });
+
           void loadFirestoreRepositoryModule()
             .then(({ FirestoreAppRepository }) => {
               const cloudRepository = new FirestoreAppRepository(state.data.auth.uid!);
@@ -270,14 +627,18 @@ export function AppProviders({ children }: PropsWithChildren) {
                 return;
               }
 
+              const message =
+                error instanceof Error
+                  ? error.message
+                  : "Saved locally, but Firestore sync needs attention.";
+
               startTransition(() => {
                 setState((current) => ({
                   ...current,
                   saveStatus: "sync_pending",
-                  error:
-                    error instanceof Error
-                      ? error.message
-                      : "Saved locally, but Firestore sync needs attention."
+                  cloudSyncStatus: "error",
+                  cloudSyncMessage: message,
+                  error: message
                 }));
               });
             });
@@ -319,7 +680,10 @@ export function AppProviders({ children }: PropsWithChildren) {
       sessions: state.data.sessions,
       lastSessionId: state.data.lastSessionId,
       saveStatus: state.saveStatus,
+      cloudSyncStatus: state.cloudSyncStatus,
+      cloudSyncMessage: state.cloudSyncMessage,
       lastSavedAt: state.lastSavedAt,
+      lastCloudSyncAt: state.lastCloudSyncAt,
       error: state.error,
       getVehicle(vehicleId) {
         return state.data.vehicles.find((vehicle) => vehicle.id === vehicleId);
@@ -360,19 +724,84 @@ export function AppProviders({ children }: PropsWithChildren) {
         return vehicle;
       },
       updateVehicle(vehicleId, updates) {
-        const sanitizedUpdates = compactVehicleUpdates(updates);
         updateData((current) => ({
           ...current,
           vehicles: current.vehicles.map((vehicle) =>
-            vehicle.id === vehicleId
-              ? {
-                  ...vehicle,
-                  ...sanitizedUpdates,
-                  updatedAt: createTimestamp()
-                }
-              : vehicle
+            vehicle.id === vehicleId ? applyVehicleUpdates(vehicle, updates) : vehicle
           )
         }));
+      },
+      async deleteVehicle(vehicleId) {
+        const guard = getVehicleDeletionGuard(vehicleId, state.data.sessions);
+        if (!guard.canDelete) {
+          return {
+            ok: false,
+            reason: guard.reason
+          };
+        }
+
+        const vehicle = state.data.vehicles.find((entry) => entry.id === vehicleId);
+        if (!vehicle) {
+          return {
+            ok: false,
+            reason: "Vehicle not found."
+          };
+        }
+
+        pendingDeletedVehicleIdsRef.current.add(vehicleId);
+        updateData((current) => ({
+          ...current,
+          vehicles: current.vehicles.filter((entry) => entry.id !== vehicleId)
+        }));
+
+        if (
+          state.data.auth.mode !== "signed_in" ||
+          !state.data.auth.uid ||
+          state.data.auth.pendingGuestSync
+        ) {
+          pendingDeletedVehicleIdsRef.current.delete(vehicleId);
+          return {
+            ok: true,
+            ...(state.data.auth.pendingGuestSync
+              ? {
+                  message:
+                    "Vehicle removed locally. Guest data stays on this device until you choose to sync it."
+                }
+              : {})
+          };
+        }
+
+        try {
+          const { FirestoreAppRepository } = await loadFirestoreRepositoryModule();
+          const cloudRepository = new FirestoreAppRepository(state.data.auth.uid);
+          await cloudRepository.deleteVehicle(vehicleId);
+
+          return {
+            ok: true
+          };
+        } catch (error) {
+          pendingDeletedVehicleIdsRef.current.delete(vehicleId);
+          const message =
+            error instanceof Error
+              ? error.message
+              : "Vehicle removed locally, but Firestore delete needs attention.";
+
+          startTransition(() => {
+            setState((current) => ({
+              ...current,
+              saveStatus: "sync_pending",
+              cloudSyncStatus: "error",
+              cloudSyncMessage: message,
+              error: message
+            }));
+          });
+
+          return {
+            ok: true,
+            message:
+              "Vehicle removed locally. Cloud deletion needs attention before the profile disappears on other devices."
+          };
+        }
       },
       createSession(vehicleId) {
         const vehicle = state.data.vehicles.find((entry) => entry.id === vehicleId);
@@ -572,8 +1001,7 @@ export function AppProviders({ children }: PropsWithChildren) {
                   status: "active",
                   currentStep: "results",
                   measurements: [...entry.measurements, measurement],
-                  baselineSetupSnapshot:
-                    entry.baselineSetupSnapshot ?? entry.setupSnapshot,
+                  baselineSetupSnapshot: entry.baselineSetupSnapshot ?? entry.setupSnapshot,
                   updatedAt: createTimestamp()
                 }
               : entry
@@ -669,6 +1097,12 @@ export function AppProviders({ children }: PropsWithChildren) {
           return false;
         }
 
+        setState((current) => ({
+          ...current,
+          cloudSyncStatus: "syncing",
+          cloudSyncMessage: "Syncing guest data to Firestore."
+        }));
+
         const userId = state.data.auth.uid;
         const guestOwnerId = createGuestOwnerId();
         const { FirestoreAppRepository } = await loadFirestoreRepositoryModule();
@@ -680,23 +1114,20 @@ export function AppProviders({ children }: PropsWithChildren) {
           createTimestamp()
         );
         const cloudState = await cloudRepository.load();
-        const mergedState: PersistedAppState = {
-          ...remappedState,
-          vehicles: mergeById(remappedState.vehicles, cloudState.vehicles),
-          sessions: mergeById(remappedState.sessions, cloudState.sessions),
-          lastSessionId: remappedState.lastSessionId ?? cloudState.lastSessionId
-        };
+        const mergedState = mergeSignedInAppState(remappedState, cloudState).mergedState;
 
         await cloudRepository.save(mergedState);
         updateData(() => mergedState);
         return true;
       },
       async clearLocalData() {
+        pendingDeletedVehicleIdsRef.current.clear();
         await repository.clear();
         setState({
           ready: true,
           data: createDefaultPersistedState(),
-          saveStatus: "idle"
+          saveStatus: "idle",
+          cloudSyncStatus: "local_only"
         });
       }
     }),

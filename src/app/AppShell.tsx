@@ -23,29 +23,69 @@ function OfflineStatus() {
 }
 
 function SaveStateIndicator() {
-  const { saveStatus, lastSavedAt, error } = useCornerBalanceApp();
+  const {
+    auth,
+    saveStatus,
+    cloudSyncStatus,
+    cloudSyncMessage,
+    lastSavedAt,
+    lastCloudSyncAt,
+    error
+  } = useCornerBalanceApp();
+
+  const title = error ?? cloudSyncMessage;
+  const signedIn = auth.mode === "signed_in";
   const statusText =
     saveStatus === "saving"
       ? "Saving local draft"
-      : saveStatus === "saved"
-        ? `Saved ${lastSavedAt ? new Date(lastSavedAt).toLocaleTimeString() : "recently"}`
-        : saveStatus === "sync_pending"
-          ? "Saved locally, cloud sync needs attention"
-          : saveStatus === "error"
-            ? "Local save needs attention"
-            : "Autosave ready";
-  const statusTone =
-    saveStatus === "sync_pending"
-      ? "border-warning/20 bg-warning/10 text-warning"
       : saveStatus === "error"
-        ? "border-danger/20 bg-danger/10 text-danger"
-        : "border-border bg-surface text-muted";
+        ? "Local save needs attention"
+        : saveStatus === "sync_pending" || cloudSyncStatus === "error"
+          ? "Saved locally, cloud sync needs attention"
+          : signedIn && cloudSyncStatus === "waiting_for_guest_sync"
+            ? "Guest data is waiting for explicit sync"
+            : signedIn && cloudSyncStatus === "connecting"
+              ? "Connecting to Firestore"
+              : signedIn && cloudSyncStatus === "syncing"
+                ? "Syncing to Firestore"
+                : signedIn && cloudSyncStatus === "using_cache"
+                  ? "Using Firestore cache"
+                  : signedIn && cloudSyncStatus === "remote_update"
+                    ? "Merged changes from another device"
+                    : signedIn && cloudSyncStatus === "conflict"
+                      ? "Kept newer local changes"
+                      : signedIn && cloudSyncStatus === "synced"
+                        ? `Synced ${
+                            lastCloudSyncAt
+                              ? new Date(lastCloudSyncAt).toLocaleTimeString()
+                              : "recently"
+                          }`
+                        : saveStatus === "saved"
+                          ? `Saved ${
+                              lastSavedAt
+                                ? new Date(lastSavedAt).toLocaleTimeString()
+                                : "recently"
+                            }`
+                          : "Autosave ready";
+  const statusTone =
+    saveStatus === "error" || cloudSyncStatus === "error"
+      ? "border-danger/20 bg-danger/10 text-danger"
+      : saveStatus === "sync_pending" ||
+          cloudSyncStatus === "waiting_for_guest_sync" ||
+          cloudSyncStatus === "using_cache" ||
+          cloudSyncStatus === "conflict"
+        ? "border-warning/20 bg-warning/10 text-warning"
+        : cloudSyncStatus === "synced"
+          ? "border-success/20 bg-success/10 text-success"
+          : cloudSyncStatus === "remote_update" || cloudSyncStatus === "syncing"
+            ? "border-primary/20 bg-primary-tint text-primary"
+            : "border-border bg-surface text-muted";
 
   return (
     <div
       role="status"
       aria-live="polite"
-      title={error}
+      title={title}
       className={`rounded-full border px-3 py-1 text-small font-medium ${statusTone}`}
     >
       {statusText}
