@@ -108,17 +108,19 @@ npm run build:release
 
 ## Environment variables
 
-Published builds in this repo already read the current Firebase web app configuration from tracked mode files:
+Firebase web config is public at runtime in any shipped browser app, but it should not be committed to git unnecessarily. This repo now keeps hosted Firebase config in GitHub Actions secrets and variables, while local developer overrides stay untracked.
 
-- `.env.alpha`
-- `.env.github-pages`
-- `.env.production`
-
-Copy `.env.example` to `.env.local` only when you want to override those defaults locally, switch to emulators, or point development at a different Firebase project.
+Copy `.env.example` to `.env.local` only when you want to enable Firebase locally, switch to emulators, or point development at a different Firebase project.
 
 ```bash
 cp .env.example .env.local
 ```
+
+Optional untracked mode-specific files also work:
+
+- `.env.alpha`
+- `.env.github-pages`
+- `.env.production`
 
 CornerBalance reads:
 
@@ -136,8 +138,6 @@ CornerBalance reads:
 - `VITE_GITHUB_PAGES_REPOSITORY`
 
 If the required Firebase values are absent, the app stays in guest-first local mode and disables auth actions automatically.
-
-The current tracked publish configuration points to Firebase project `silken-obelisk-415721`.
 
 For the normal Firebase and local alpha builds, keep `VITE_BASE_PATH=/`.  
 For GitHub Pages, the workflow sets the repo subpath automatically through the `github-pages` build mode.
@@ -306,10 +306,15 @@ The repo now includes:
 
 Set these GitHub repo settings before using the deployment workflows:
 
+- Repository secret: `VITE_FIREBASE_API_KEY`
 - Repository variable: `FIREBASE_PROJECT_ID`
+- Repository variable: `VITE_FIREBASE_AUTH_DOMAIN`
+- Repository variable: `VITE_FIREBASE_STORAGE_BUCKET`
+- Repository variable: `VITE_FIREBASE_MESSAGING_SENDER_ID`
+- Repository variable: `VITE_FIREBASE_APP_ID`
 - Repository secret: `FIREBASE_SERVICE_ACCOUNT_CORNER_BALANCER`
 
-The preview and live workflows are manual by default so they do not auto-deploy while the repo is still using draft placeholder artwork.
+The Pages and Firebase deployment workflows now fail fast if those hosted Firebase settings are missing, so they cannot silently publish a guest-only build when auth-backed behavior is expected.
 
 ### Firebase docs used for this setup
 
@@ -331,6 +336,7 @@ Those docs currently recommend keeping `.firebaserc` local for starter or shared
 - Use `npm run build:release` or `npm run firebase:deploy` for production deployment, not plain `build`.
 - Use `npm run build:alpha`, `npm run firebase:deploy:alpha`, or the GitHub Pages workflow while placeholders are still in use.
 - The current repo ships development placeholders only; production deployment must wait for approved assets.
+- `npm run security:scan` blocks Google-style API keys from being committed to the repo again.
 - Firestore sync is additive to the local-first model. Guest work stays local until the user explicitly signs in and chooses to sync it.
 - Live Firestore listeners merge remote updates into the local workspace and surface when cached data or preserved local edits need attention.
 - Preview channels and live deployments use the real Firebase backend for the selected project.
