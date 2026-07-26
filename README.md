@@ -108,7 +108,13 @@ npm run build:release
 
 ## Environment variables
 
-Copy `.env.example` to `.env.local` and fill in the Firebase values when you are ready to enable auth and Firestore.
+Published builds in this repo already read the current Firebase web app configuration from tracked mode files:
+
+- `.env.alpha`
+- `.env.github-pages`
+- `.env.production`
+
+Copy `.env.example` to `.env.local` only when you want to override those defaults locally, switch to emulators, or point development at a different Firebase project.
 
 ```bash
 cp .env.example .env.local
@@ -130,6 +136,8 @@ CornerBalance reads:
 - `VITE_GITHUB_PAGES_REPOSITORY`
 
 If the required Firebase values are absent, the app stays in guest-first local mode and disables auth actions automatically.
+
+The current tracked publish configuration points to Firebase project `silken-obelisk-415721`.
 
 For the normal Firebase and local alpha builds, keep `VITE_BASE_PATH=/`.  
 For GitHub Pages, the workflow sets the repo subpath automatically through the `github-pages` build mode.
@@ -253,6 +261,10 @@ The repo now includes a dedicated Pages workflow:
 - [.github/workflows/github-pages-alpha.yml](/C:/Users/gabri/OneDrive/Documents/Datum/corner-balancer/.github/workflows/github-pages-alpha.yml)
 
 It builds the placeholder-safe Pages bundle on `main` and deploys `dist-pages` through GitHub Actions.
+
+Current live Pages URL:
+
+- [https://madcowg.github.io/corner-balancer/](https://madcowg.github.io/corner-balancer/)
 
 To enable it in GitHub:
 
